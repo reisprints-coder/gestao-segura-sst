@@ -1,0 +1,9 @@
+{
+  "name": "Gestão Segura SST",
+  "short_name": "Gestão SST",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#f3f6f7",
+  "theme_color": "#0b5968",
+  "icons": []
+}

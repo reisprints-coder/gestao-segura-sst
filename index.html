@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0b4d5c" />
+  <title>Gestão Segura SST</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="toast" class="toast" aria-live="polite"></div>
+
+  <section id="login-screen" class="login-screen">
+    <div class="login-art">
+      <div class="brand-mark large">GS</div>
+      <div>
+        <p class="eyebrow">OPERAÇÃO INDUSTRIAL • SST</p>
+        <h1>Gestão Segura</h1>
+        <p>Controle integrado de EPI, treinamentos, gastos, empilhadeiras e DDS.</p>
+      </div>
+      <div class="industrial-illustration" aria-hidden="true">
+        <div class="warehouse"></div>
+        <div class="forklift-shape"><span></span></div>
+      </div>
+    </div>
+    <form id="login-form" class="login-card">
+      <div class="brand-row"><div class="brand-mark">GS</div><div><strong>Gestão Segura</strong><small>SST & Operações</small></div></div>
+      <h2>Entrar no sistema</h2>
+      <p class="muted">Use o acesso de demonstração para validar a primeira versão.</p>
+      <label>E-mail<input id="login-email" type="email" value="admin@gestaosegura.local" required /></label>
+      <label>Senha<input id="login-password" type="password" value="admin123" required /></label>
+      <button class="btn primary full" type="submit">Entrar</button>
+      <button id="demo-login" class="btn ghost full" type="button">Entrar em modo demonstração</button>
+      <small class="muted">Acesso demo: admin@gestaosegura.local / admin123</small>
+    </form>
+  </section>
+
+  <div id="app" class="app hidden">
+    <aside id="sidebar" class="sidebar">
+      <div class="brand-row sidebar-brand"><div class="brand-mark">GS</div><div><strong>Gestão Segura</strong><small>SST & Operações</small></div></div>
+      <nav id="nav"></nav>
+      <div class="sidebar-footer">
+        <div class="user-mini"><div class="avatar">JV</div><div><strong>João Victor</strong><small>Administrador</small></div></div>
+        <button id="logout-btn" class="icon-btn" title="Sair">↪</button>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <button id="menu-btn" class="icon-btn mobile-only" aria-label="Abrir menu">☰</button>
+        <div>
+          <p class="eyebrow" id="breadcrumb">VISÃO GERAL</p>
+          <h2 id="page-title">Dashboard</h2>
+        </div>
+        <div class="top-actions">
+          <label class="search-global"><span>⌕</span><input id="global-search" placeholder="Buscar no sistema" /></label>
+          <button id="theme-btn" class="icon-btn" title="Alternar tema">◐</button>
+          <button id="notification-btn" class="icon-btn notification-button" title="Notificações">♢<span id="notification-count">0</span></button>
+        </div>
+      </header>
+
+      <section id="page-content" class="page-content"></section>
+    </main>
+  </div>
+
+  <div id="modal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-card">
+      <div class="modal-header"><div><p class="eyebrow" id="modal-kicker">CADASTRO</p><h3 id="modal-title"></h3></div><button id="modal-close" class="icon-btn">×</button></div>
+      <form id="modal-form" class="form-grid"></form>
+    </div>
+  </div>
+
+  <script src="app.js" defer></script>
+</body>
+</html>
