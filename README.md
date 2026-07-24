@@ -13,12 +13,9 @@ Site app independente para controle de saúde, segurança e apoio operacional.
 - Dashboard, alertas automáticos, auditoria e exportação CSV
 - Layout responsivo, tema claro/escuro e instalação como PWA
 
-## Acesso demonstrativo
+## Primeiro acesso
 
-- E-mail: `admin@gestaosegura.local`
-- Senha: `admin123`
-
-A demonstração persiste dados no `localStorage` do navegador. Ela permite validar imediatamente os fluxos principais sem depender de serviço externo.
+No primeiro acesso, use **Primeiro acesso: criar administrador**. O primeiro usuário criado pela função segura `bootstrap-admin` recebe automaticamente o perfil de administrador e já entra com o e-mail confirmado. Não existe senha padrão fixa.
 
 ## Executar localmente
 
@@ -32,16 +29,11 @@ Depois acesse `http://localhost:8080`.
 
 ## Supabase
 
-O arquivo `supabase/schema.sql` contém o modelo relacional, funções auxiliares, índices, gatilhos e políticas RLS para transformar a demonstração em aplicação multiusuário.
+O sistema está conectado ao projeto Supabase `cdklivezkqkacoopoyhz`, com autenticação, banco relacional, RLS e buckets privados.
 
 Passos:
 
-1. Criar um projeto Supabase na região `sa-east-1`.
-2. Executar `supabase/schema.sql` no SQL Editor.
-3. Criar os buckets privados `certificates`, `expenses`, `epi-terms` e `maintenance`.
-4. Configurar autenticação por e-mail.
-5. Informar URL e chave pública no ambiente de publicação.
-6. Substituir o adaptador de `localStorage` do `app.js` pelas consultas Supabase.
+A URL e a chave publicável ficam em `config.js`. Chaves administrativas nunca devem ser colocadas no navegador.
 
 ## Estrutura
 
@@ -52,6 +44,9 @@ app.js
 manifest.webmanifest
 service-worker.js
 supabase/schema.sql
+supabase/migrations/
+.github/workflows/pages.yml
+config.js
 vercel.json
 ```
 
@@ -63,10 +58,11 @@ vercel.json
 - Auditoria de criação, edição e mudança de status
 - Arquivos privados com acesso por usuário autenticado
 
-## Próximas etapas recomendadas
+## Publicação
 
-1. Ativar o projeto Supabase e integrar autenticação real.
-2. Migrar a persistência local para consultas ao banco.
-3. Implantar assinatura digital dos termos de EPI e listas de DDS.
-4. Gerar PDFs padronizados.
-5. Publicar em domínio definitivo e configurar rotina de backup.
+O workflow `.github/workflows/pages.yml` publica automaticamente a branch `main` no GitHub Pages.
+
+
+## Publicação assistida no Windows
+
+Execute `PUBLICAR_NO_GITHUB.bat`. O script clona o repositório, substitui os arquivos, cria o commit e envia para a branch `main`.

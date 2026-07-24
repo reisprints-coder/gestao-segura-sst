@@ -1,7 +1,15 @@
 'use strict';
 
-const STORAGE_KEY = 'gestao-segura-sst-v1';
-const SESSION_KEY = 'gestao-segura-session';
+const SUPABASE_URL = window.APP_CONFIG?.supabaseUrl;
+const SUPABASE_KEY = window.APP_CONFIG?.supabasePublishableKey;
+if (!SUPABASE_URL || !SUPABASE_KEY || !window.supabase) {
+  document.body.innerHTML = '<main style="font-family:Arial;padding:32px"><h1>Configuração incompleta</h1><p>As credenciais públicas do Supabase não foram carregadas.</p></main>';
+  throw new Error('Supabase não configurado');
+}
+
+const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+  auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
+});
 
 const navItems = [
   ['dashboard', '▦', 'Dashboard'],
@@ -16,83 +24,167 @@ const navItems = [
   ['settings', '⚙', 'Configurações'],
 ];
 
-const seedState = {
-  employees: [
-    { id: crypto.randomUUID(), name: 'João Victor Santos', registration: 'LMP-001', role: 'Líder de Equipe', sector: 'Operações', company: 'BR Soluções', admission: '2023-01-10', phone: '(22) 99999-1001', email: 'joao@empresa.com', status: 'Ativo' },
-    { id: crypto.randomUUID(), name: 'Carlos Henrique Lima', registration: 'LMP-014', role: 'Operador de Planta', sector: 'Fluidos', company: 'BR Soluções', admission: '2024-03-11', phone: '(22) 99999-1014', email: 'carlos@empresa.com', status: 'Ativo' },
-    { id: crypto.randomUUID(), name: 'Marcos Vinícius Alves', registration: 'LMP-021', role: 'Operador de Empilhadeira', sector: 'Logística', company: 'BR Soluções', admission: '2024-08-05', phone: '(22) 99999-1021', email: 'marcos@empresa.com', status: 'Férias' },
-    { id: crypto.randomUUID(), name: 'Ana Paula Ribeiro', registration: 'ADM-007', role: 'Assistente Administrativo', sector: 'Administrativo', company: 'BR Soluções', admission: '2025-02-03', phone: '(22) 99999-2007', email: 'ana@empresa.com', status: 'Ativo' },
-    { id: crypto.randomUUID(), name: 'Felipe Souza Braga', registration: 'MNT-009', role: 'Mecânico', sector: 'Manutenção', company: 'BR Soluções', admission: '2025-05-12', phone: '(22) 99999-3009', email: 'felipe@empresa.com', status: 'Ativo' },
-  ],
-  epis: [
-    { id: crypto.randomUUID(), code: 'EPI-001', name: 'Capacete de segurança com jugular', category: 'Proteção da cabeça', ca: '49822', caExpiry: '2027-08-01', size: 'Único', stock: 18, minimum: 10, unitCost: 74.90, location: 'Almoxarifado A', status: 'Ativo' },
-    { id: crypto.randomUUID(), code: 'EPI-002', name: 'Óculos de proteção incolor', category: 'Proteção ocular', ca: '11268', caExpiry: '2027-02-18', size: 'Único', stock: 7, minimum: 15, unitCost: 18.50, location: 'Almoxarifado A', status: 'Estoque baixo' },
-    { id: crypto.randomUUID(), code: 'EPI-003', name: 'Luva nitrílica química', category: 'Proteção das mãos', ca: '38955', caExpiry: '2026-09-15', size: 'G', stock: 42, minimum: 20, unitCost: 29.80, location: 'Almoxarifado B', status: 'Ativo' },
-    { id: crypto.randomUUID(), code: 'EPI-004', name: 'Protetor auricular tipo plug', category: 'Proteção auditiva', ca: '5745', caExpiry: '2028-01-10', size: 'Único', stock: 95, minimum: 30, unitCost: 4.90, location: 'Almoxarifado A', status: 'Ativo' },
-    { id: crypto.randomUUID(), code: 'EPI-005', name: 'Macacão RF laranja', category: 'Vestimenta', ca: '42310', caExpiry: '2026-08-28', size: 'GG', stock: 4, minimum: 8, unitCost: 485.00, location: 'Vestiário', status: 'Estoque baixo' },
-  ],
-  epiDeliveries: [],
-  courses: [
-    { id: crypto.randomUUID(), employee: 'João Victor Santos', employeeRegistration: 'LMP-001', course: 'NR 35 — Trabalho em Altura', institution: 'Wegas Treinamentos', completedAt: '2025-09-12', expiresAt: '2027-09-12', hours: 8, certificate: 'NR35_Joao.pdf' },
-    { id: crypto.randomUUID(), employee: 'Carlos Henrique Lima', employeeRegistration: 'LMP-014', course: 'NR 33 — Espaço Confinado', institution: 'Treina Brasil', completedAt: '2025-08-10', expiresAt: '2026-08-10', hours: 16, certificate: 'NR33_Carlos.pdf' },
-    { id: crypto.randomUUID(), employee: 'Marcos Vinícius Alves', employeeRegistration: 'LMP-021', course: 'Operador de Empilhadeira', institution: 'Wegas Treinamentos', completedAt: '2025-07-20', expiresAt: '2026-07-20', hours: 16, certificate: 'Empilhadeira_Marcos.pdf' },
-    { id: crypto.randomUUID(), employee: 'Felipe Souza Braga', employeeRegistration: 'MNT-009', course: 'NR 12 — Segurança em Máquinas', institution: 'SENAI', completedAt: '2026-04-02', expiresAt: '2028-04-02', hours: 8, certificate: 'NR12_Felipe.pdf' },
-  ],
-  expenses: [
-    { id: crypto.randomUUID(), date: '2026-07-02', description: 'Aquisição de luvas nitrílicas', category: 'EPI', costCenter: 'CC-SEG-001', supplier: 'Protege Mais', value: 2980, status: 'Pago', document: 'NF 48291' },
-    { id: crypto.randomUUID(), date: '2026-07-08', description: 'Manutenção preventiva empilhadeira EMP-02', category: 'Manutenção', costCenter: 'CC-MNT-002', supplier: 'TecFork', value: 4250, status: 'Aprovado', document: 'OS 2026-071' },
-    { id: crypto.randomUUID(), date: '2026-07-16', description: 'Treinamento NR 33 — turma operacional', category: 'Treinamentos', costCenter: 'CC-RH-003', supplier: 'Treina Brasil', value: 6800, status: 'Aguardando aprovação', document: 'ORC 9912' },
-    { id: crypto.randomUUID(), date: '2026-07-19', description: 'Reposição de extintor da empilhadeira', category: 'Manutenção', costCenter: 'CC-MNT-002', supplier: 'FireSafe', value: 440, status: 'Pago', document: 'NF 10829' },
-  ],
-  budgets: { EPI: 15000, Manutenção: 18000, Treinamentos: 12000, Outros: 5000 },
-  forklifts: [
-    { id: crypto.randomUUID(), code: 'EMP-01', asset: 'PAT-00125', manufacturer: 'Toyota', model: '8FG25', capacity: '2,5 t', year: 2022, hourMeter: 1842, location: 'Galpão 1', status: 'Operando', nextMaintenance: '2026-08-15', maintenanceHour: 2000 },
-    { id: crypto.randomUUID(), code: 'EMP-02', asset: 'PAT-00131', manufacturer: 'Hyster', model: 'H2.5FT', capacity: '2,5 t', year: 2021, hourMeter: 2965, location: 'Área externa', status: 'Manutenção programada', nextMaintenance: '2026-07-28', maintenanceHour: 3000 },
-    { id: crypto.randomUUID(), code: 'EMP-03', asset: 'PAT-00148', manufacturer: 'Yale', model: 'GDP30VX', capacity: '3,0 t', year: 2020, hourMeter: 5120, location: 'Galpão 2', status: 'Interditada', nextMaintenance: '2026-07-20', maintenanceHour: 5100 },
-  ],
-  maintenances: [
-    { id: crypto.randomUUID(), forklift: 'EMP-02', type: 'Preventiva', priority: 'Média', openedAt: '2026-07-22', description: 'Revisão de 3.000 horas', status: 'Em andamento', cost: 4250 },
-    { id: crypto.randomUUID(), forklift: 'EMP-03', type: 'Corretiva', priority: 'Crítica', openedAt: '2026-07-20', description: 'Vazamento hidráulico no mastro', status: 'Aguardando peça', cost: 7800 },
-  ],
-  checklists: [],
-  dds: [
-    { id: crypto.randomUUID(), date: '2026-07-23', time: '07:00', theme: 'Movimentação segura de cargas', sector: 'Operações', leader: 'João Victor Santos', participants: 14, status: 'Concluído', duration: 20 },
-    { id: crypto.randomUUID(), date: '2026-07-24', time: '07:00', theme: 'Uso correto de EPI', sector: 'Fluidos', leader: 'Carlos Henrique Lima', participants: 12, status: 'Concluído', duration: 15 },
-    { id: crypto.randomUUID(), date: '2026-07-25', time: '07:00', theme: 'Prevenção de prensamento de mãos', sector: 'Logística', leader: 'João Victor Santos', participants: 0, status: 'Programado', duration: 20 },
-  ],
-  audit: [
-    { id: crypto.randomUUID(), date: new Date().toISOString(), user: 'Sistema', action: 'Base demonstrativa inicial criada' },
-  ],
-  settings: { company: 'BR Soluções', unit: 'Porto do Açu — LMP', monthlyBudget: 50000, theme: 'light' },
+const emptyState = {
+  employees: [], epis: [], epiDeliveries: [], courses: [], expenses: [],
+  forklifts: [], maintenances: [], checklists: [], dds: [], audit: [],
+  settings: { company: 'BR Soluções', unit: 'Porto do Açu — LMP', monthlyBudget: 50000, theme: localStorage.getItem('gst-theme') || 'light' },
+  profile: null,
 };
 
-let state = loadState();
+const employeeStatus = { active:'Ativo', vacation:'Férias', leave:'Afastado', terminated:'Desligado' };
+const employeeStatusDb = Object.fromEntries(Object.entries(employeeStatus).map(([k,v])=>[v,k]));
+const expenseStatus = { planned:'Previsto', requested:'Solicitado', pending_approval:'Aguardando aprovação', approved:'Aprovado', paid:'Pago', cancelled:'Cancelado' };
+const expenseStatusDb = Object.fromEntries(Object.entries(expenseStatus).map(([k,v])=>[v,k]));
+const forkliftStatus = { available:'Disponível', operating:'Operando', stopped:'Parada', scheduled_maintenance:'Manutenção programada', corrective_maintenance:'Manutenção corretiva', interdicted:'Interditada', retired:'Baixada' };
+const forkliftStatusDb = Object.fromEntries(Object.entries(forkliftStatus).map(([k,v])=>[v,k]));
+const maintenanceType = { preventive:'Preventiva', corrective:'Corretiva', inspection:'Inspeção' };
+const maintenanceTypeDb = Object.fromEntries(Object.entries(maintenanceType).map(([k,v])=>[v,k]));
+const priorityMap = { low:'Baixa', medium:'Média', high:'Alta', critical:'Crítica' };
+const priorityDb = Object.fromEntries(Object.entries(priorityMap).map(([k,v])=>[v,k]));
+const ddsStatus = { scheduled:'Programado', completed:'Concluído', cancelled:'Cancelado' };
+const ddsStatusDb = Object.fromEntries(Object.entries(ddsStatus).map(([k,v])=>[v,k]));
+
+let state = structuredClone(emptyState);
+let lookups = { categories: [], costCenters: [], trainingCatalog: [], batches: [], plans: [] };
+let currentUser = null;
 let currentPage = 'dashboard';
 let tableSearch = '';
 let tableFilter = 'Todos';
+let authMode = 'login';
 
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
 const currency = (value) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(value || 0));
 const number = (value) => new Intl.NumberFormat('pt-BR').format(Number(value || 0));
-const dateBR = (value) => value ? new Intl.DateTimeFormat('pt-BR', { timeZone: 'UTC' }).format(new Date(`${value}T12:00:00Z`)) : '—';
+const dateBR = (value) => value ? new Intl.DateTimeFormat('pt-BR', { timeZone: 'UTC' }).format(new Date(`${String(value).slice(0,10)}T12:00:00Z`)) : '—';
 const todayISO = () => new Date().toISOString().slice(0, 10);
-const initials = (name) => name.split(' ').slice(0, 2).map(v => v[0]).join('').toUpperCase();
+const initials = (name = '') => name.split(' ').filter(Boolean).slice(0, 2).map(v => v[0]).join('').toUpperCase() || 'US';
 const escapeHtml = (value = '') => String(value).replace(/[&<>'"]/g, char => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' }[char]));
 
-function loadState() {
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    return saved ? { ...structuredClone(seedState), ...JSON.parse(saved) } : structuredClone(seedState);
-  } catch {
-    return structuredClone(seedState);
-  }
+function must(data, label) {
+  if (data.error) throw new Error(`${label}: ${data.error.message}`);
+  return data.data || [];
 }
 
-function saveState(action = '') {
-  if (action) state.audit.unshift({ id: crypto.randomUUID(), date: new Date().toISOString(), user: 'João Victor', action });
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+async function loadData() {
+  const queries = await Promise.all([
+    db.from('profiles').select('*').eq('id', currentUser.id).maybeSingle(),
+    db.from('employees').select('*').is('archived_at', null).order('full_name'),
+    db.from('epi_catalog').select('*').neq('status', 'archived').order('description'),
+    db.from('epi_batches').select('*').order('received_at'),
+    db.from('epi_movements').select('*').eq('movement_type','delivery').order('movement_at',{ascending:false}),
+    db.from('training_catalog').select('*').order('name'),
+    db.from('employee_trainings').select('*').order('expires_at'),
+    db.from('expense_categories').select('*').order('name'),
+    db.from('cost_centers').select('*').order('code'),
+    db.from('expenses').select('*').is('archived_at', null).order('expense_date',{ascending:false}),
+    db.from('forklifts').select('*').is('archived_at', null).order('code'),
+    db.from('maintenance_plans').select('*'),
+    db.from('maintenance_orders').select('*').order('opened_at',{ascending:false}),
+    db.from('forklift_checklists').select('*').order('inspection_date',{ascending:false}),
+    db.from('dds_sessions').select('*').order('session_date',{ascending:false}),
+    db.from('audit_logs').select('*').order('created_at',{ascending:false}).limit(50),
+    db.from('app_settings').select('*').eq('id',1).maybeSingle(),
+  ]);
+  const [profileQ, employeesQ, episQ, batchesQ, movementsQ, catalogQ, trainingsQ, categoriesQ, centersQ, expensesQ, forkliftsQ, plansQ, maintenanceQ, checksQ, ddsQ, auditQ, settingsQ] = queries;
+  if (profileQ.error) throw profileQ.error;
+  state.profile = profileQ.data;
+  const employees = must(employeesQ,'Funcionários');
+  const epis = must(episQ,'EPIs');
+  const batches = must(batchesQ,'Lotes');
+  const movements = must(movementsQ,'Movimentações');
+  const catalog = must(catalogQ,'Catálogo de cursos');
+  const trainings = must(trainingsQ,'Cursos');
+  const categories = must(categoriesQ,'Categorias');
+  const centers = must(centersQ,'Centros de custo');
+  const expenses = must(expensesQ,'Gastos');
+  const forklifts = must(forkliftsQ,'Empilhadeiras');
+  const plans = must(plansQ,'Planos de manutenção');
+  const maintenance = must(maintenanceQ,'Ordens de manutenção');
+  const checks = must(checksQ,'Checklists');
+  const dds = must(ddsQ,'DDS');
+  const audit = must(auditQ,'Auditoria');
+  lookups = { categories, costCenters: centers, trainingCatalog: catalog, batches, plans };
+
+  state.employees = employees.map(x=>({ id:x.id, name:x.full_name, registration:x.registration, role:x.job_title, sector:x.department, company:x.company, admission:x.admission_date, phone:x.phone||'', email:x.email||'', status:employeeStatus[x.status]||x.status }));
+  state.epis = epis.map(x=>{ const bs=batches.filter(b=>b.epi_id===x.id); return { id:x.id, batchId:bs[0]?.id||'', code:x.internal_code, name:x.description, category:x.category, ca:x.ca_number, caExpiry:x.ca_expiry, size:x.size||'', stock:bs.reduce((s,b)=>s+Number(b.current_quantity),0), minimum:Number(x.minimum_stock), unitCost:Number(x.unit_cost), location:x.storage_location||'', status:x.status==='active'?'Ativo':'Inativo' }; });
+  state.epiDeliveries = movements.map(x=>({ id:x.id, epiId:x.epi_id, employeeId:x.employee_id, batchId:x.batch_id, epi:state.epis.find(e=>e.id===x.epi_id)?.name||'EPI', employee:state.employees.find(e=>e.id===x.employee_id)?.name||'Funcionário', quantity:Number(x.quantity), date:String(x.movement_at).slice(0,10), reason:x.reason||'', signed:Boolean(x.signed_at) }));
+  state.courses = trainings.map(x=>{ const e=state.employees.find(v=>v.id===x.employee_id); const c=catalog.find(v=>v.id===x.training_id); return { id:x.id, employeeId:x.employee_id, trainingId:x.training_id, employee:e?.name||'Funcionário', employeeRegistration:e?.registration||'', course:c?.name||'Curso', institution:x.institution||c?.institution||'', completedAt:x.completed_at, expiresAt:x.expires_at, hours:Number(c?.workload_hours||0), certificate:x.certificate_path||'' }; });
+  state.expenses = expenses.map(x=>({ id:x.id, date:x.expense_date, description:x.description, category:categories.find(c=>c.id===x.category_id)?.name||'Outros', costCenter:centers.find(c=>c.id===x.cost_center_id)?.code||'', supplier:x.supplier||'', value:Number(x.amount), status:expenseStatus[x.status]||x.status, document:x.document_number||'', attachment:x.attachment_path||'' }));
+  state.forklifts = forklifts.map(x=>{ const p=plans.find(v=>v.forklift_id===x.id && v.active) || {}; return { id:x.id, planId:p.id||'', code:x.code, asset:x.asset_number||'', manufacturer:x.manufacturer||'', model:x.model||'', capacity:x.capacity_tons?`${Number(x.capacity_tons).toLocaleString('pt-BR')} t`:'', year:x.manufacture_year||'', hourMeter:Number(x.hour_meter), location:x.location||'', status:forkliftStatus[x.status]||x.status, nextMaintenance:p.next_due_date||'', maintenanceHour:Number(p.next_due_hour||0) }; });
+  state.maintenances = maintenance.map(x=>({ id:x.id, forkliftId:x.forklift_id, forklift:state.forklifts.find(f=>f.id===x.forklift_id)?.code||'', type:maintenanceType[x.maintenance_type]||x.maintenance_type, priority:priorityMap[x.priority]||x.priority, openedAt:String(x.opened_at).slice(0,10), description:x.failure_description, status:({open:'Aberta',in_progress:'Em andamento',waiting_parts:'Aguardando peça',completed:'Concluída'})[x.status]||x.status, cost:Number(x.labor_cost)+Number(x.parts_cost), attachment:x.attachment_path||'' }));
+  state.checklists = checks.map(x=>({ id:x.id, forkliftId:x.forklift_id, forklift:state.forklifts.find(f=>f.id===x.forklift_id)?.code||'', date:x.inspection_date, shift:x.shift, failed:Array.isArray(x.items)?x.items.filter(i=>i.status==='Não conforme').length:(x.has_critical_failure?1:0), notes:x.notes||'' }));
+  state.dds = dds.map(x=>({ id:x.id, date:x.session_date, time:String(x.session_time).slice(0,5), theme:x.custom_topic||'DDS', sector:x.department||'', leaderId:x.responsible_id, leader:state.employees.find(e=>e.id===x.responsible_id)?.name||'', participants:Number(x.participant_count||0), status:ddsStatus[x.status]||x.status, duration:Number(x.duration_minutes||0) }));
+  state.audit = audit.map(x=>({ id:x.id, date:x.created_at, user:'Sistema', action:x.action }));
+  if (settingsQ.error) throw settingsQ.error;
+  if (settingsQ.data) state.settings = { ...state.settings, company:settingsQ.data.company, unit:settingsQ.data.unit, monthlyBudget:Number(settingsQ.data.monthly_budget) };
+  updateUserUI();
+}
+
+async function ensureCategory(name) {
+  let item=lookups.categories.find(x=>x.name===name); if(item) return item.id;
+  const q=await db.from('expense_categories').insert({name,status:'active'}).select().single(); if(q.error) throw q.error; lookups.categories.push(q.data); return q.data.id;
+}
+async function ensureCostCenter(code) {
+  let item=lookups.costCenters.find(x=>x.code===code); if(item) return item.id;
+  const q=await db.from('cost_centers').insert({code,name:code,monthly_budget:0,annual_budget:0,status:'active'}).select().single(); if(q.error) throw q.error; lookups.costCenters.push(q.data); return q.data.id;
+}
+async function ensureTraining(name,hours,institution) {
+  let item=lookups.trainingCatalog.find(x=>x.name===name); if(item) return item.id;
+  const q=await db.from('training_catalog').insert({name,training_type:'Interno',workload_hours:Number(hours||0),institution,status:'active'}).select().single(); if(q.error) throw q.error; lookups.trainingCatalog.push(q.data); return q.data.id;
+}
+
+async function syncState(action='') {
+  const uid=currentUser.id;
+  for (const x of state.employees) {
+    const q=await db.from('employees').upsert({id:x.id,full_name:x.name,registration:x.registration,job_title:x.role,department:x.sector,company:x.company,admission_date:x.admission||null,phone:x.phone||null,email:x.email||null,status:employeeStatusDb[x.status]||'active',updated_by:uid,created_by:uid},{onConflict:'id'}); if(q.error) throw q.error;
+  }
+  for (const x of state.epis) {
+    const q=await db.from('epi_catalog').upsert({id:x.id,internal_code:x.code,description:x.name,category:x.category,ca_number:x.ca,ca_expiry:x.caExpiry||null,size:x.size||null,minimum_stock:Number(x.minimum||0),unit_cost:Number(x.unitCost||0),storage_location:x.location||null,status:x.status==='Inativo'?'inactive':'active',created_by:uid,updated_by:uid},{onConflict:'id'}); if(q.error) throw q.error;
+    if(!x.batchId) x.batchId=crypto.randomUUID();
+    const b=await db.from('epi_batches').upsert({id:x.batchId,epi_id:x.id,batch_number:`APP-${x.code}`,supplier:'Cadastro do sistema',received_at:todayISO(),initial_quantity:Number(x.stock||0),current_quantity:Number(x.stock||0),unit_cost:Number(x.unitCost||0),created_by:uid},{onConflict:'id'}); if(b.error) throw b.error;
+  }
+  for (const x of state.courses) {
+    const employee=state.employees.find(e=>e.name===x.employee)||state.employees.find(e=>e.registration===x.employeeRegistration); if(!employee) continue;
+    const trainingId=await ensureTraining(x.course,x.hours,x.institution); x.employeeId=employee.id; x.trainingId=trainingId;
+    const q=await db.from('employee_trainings').upsert({id:x.id,employee_id:employee.id,training_id:trainingId,completed_at:x.completedAt||null,expires_at:x.expiresAt||null,institution:x.institution||null,certificate_path:x.certificate||null,created_by:uid,updated_by:uid},{onConflict:'id'}); if(q.error) throw q.error;
+  }
+  for (const x of state.expenses) {
+    const categoryId=await ensureCategory(x.category); const centerId=await ensureCostCenter(x.costCenter);
+    const q=await db.from('expenses').upsert({id:x.id,expense_date:x.date,competence:`${String(x.date).slice(0,7)}-01`,description:x.description,category_id:categoryId,cost_center_id:centerId,supplier:x.supplier||null,document_number:x.document||null,amount:Number(x.value||0),status:expenseStatusDb[x.status]||'requested',attachment_path:x.attachment||null,requested_by:uid,approved_by:['Aprovado','Pago'].includes(x.status)?uid:null,approved_at:['Aprovado','Pago'].includes(x.status)?new Date().toISOString():null},{onConflict:'id'}); if(q.error) throw q.error;
+  }
+  for (const x of state.forklifts) {
+    const cap=Number(String(x.capacity||'').replace(',','.').replace(/[^0-9.]/g,''))||null;
+    const q=await db.from('forklifts').upsert({id:x.id,code:x.code,asset_number:x.asset||null,manufacturer:x.manufacturer||null,model:x.model||null,capacity_tons:cap,manufacture_year:Number(x.year)||null,hour_meter:Number(x.hourMeter||0),location:x.location||null,status:forkliftStatusDb[x.status]||'available'},{onConflict:'id'}); if(q.error) throw q.error;
+    if(!x.planId) x.planId=crypto.randomUUID();
+    const p=await db.from('maintenance_plans').upsert({id:x.planId,forklift_id:x.id,name:'Manutenção preventiva',interval_days:180,interval_hours:500,next_due_date:x.nextMaintenance||null,next_due_hour:Number(x.maintenanceHour||0),active:true},{onConflict:'id'}); if(p.error) throw p.error;
+  }
+  for (const x of state.maintenances) {
+    const forklift=state.forklifts.find(f=>f.code===x.forklift)||state.forklifts.find(f=>f.id===x.forkliftId); if(!forklift) continue;
+    const q=await db.from('maintenance_orders').upsert({id:x.id,forklift_id:forklift.id,maintenance_type:maintenanceTypeDb[x.type]||'inspection',priority:priorityDb[x.priority]||'medium',failure_description:x.description,labor_cost:Number(x.cost||0),parts_cost:0,opened_at:`${x.openedAt}T12:00:00Z`,status:({'Aberta':'open','Em andamento':'in_progress','Aguardando peça':'waiting_parts','Concluída':'completed'})[x.status]||'open',attachment_path:x.attachment||null,opened_by:uid},{onConflict:'id'}); if(q.error) throw q.error;
+  }
+  for (const x of state.dds) {
+    const leader=state.employees.find(e=>e.name===x.leader)||state.employees.find(e=>e.id===x.leaderId);
+    const q=await db.from('dds_sessions').upsert({id:x.id,session_date:x.date,session_time:x.time,custom_topic:x.theme,department:x.sector,unit:state.settings.unit,responsible_id:leader?.id||null,duration_minutes:Number(x.duration||0),participant_count:Number(x.participants||0),status:ddsStatusDb[x.status]||'scheduled',created_by:uid},{onConflict:'id'}); if(q.error) throw q.error;
+  }
+  const settingsQ=await db.from('app_settings').upsert({id:1,company:state.settings.company,unit:state.settings.unit,monthly_budget:Number(state.settings.monthlyBudget||0),updated_by:uid},{onConflict:'id'}); if(settingsQ.error) throw settingsQ.error;
+  if(action){ const a=await db.from('audit_logs').insert({user_id:uid,action,entity_type:'application'}); if(a.error) console.warn(a.error); }
+  localStorage.setItem('gst-theme',state.settings.theme||'light');
+  await loadData();
   updateNotificationCount();
+}
+
+async function uploadFromForm(form,inputName,bucket) {
+  const file=form.elements[inputName]?.files?.[0]; if(!file) return '';
+  const safe=file.name.normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-zA-Z0-9._-]/g,'-');
+  const path=`${currentUser.id}/${Date.now()}-${safe}`;
+  const result=await db.storage.from(bucket).upload(path,file,{upsert:false}); if(result.error) throw result.error; return path;
+}
+
+function updateUserUI(){
+  const name=state.profile?.full_name||currentUser?.email||'Usuário';
+  const role=({admin:'Administrador',manager:'Gestor',warehouse:'Almoxarifado',maintenance:'Manutenção',employee:'Colaborador',viewer:'Visualizador'})[state.profile?.role]||'Usuário';
+  const mini=document.querySelector('.user-mini'); if(mini) mini.innerHTML=`<div class="avatar">${initials(name)}</div><div><strong>${escapeHtml(name)}</strong><small>${escapeHtml(role)}</small></div>`;
 }
 
 function toast(message) {
@@ -276,7 +368,7 @@ function renderReports() {
 }
 
 function renderSettings() {
-  $('#page-content').innerHTML = `<div class="toolbar"><div><h3 style="margin:0">Configurações</h3><p class="muted" style="margin:5px 0 0">Dados da unidade, orçamento e armazenamento.</p></div></div><section class="panel"><form id="settings-form" class="form-grid" style="padding:0"><label>Empresa<input name="company" value="${escapeHtml(state.settings.company)}" /></label><label>Unidade / base<input name="unit" value="${escapeHtml(state.settings.unit)}" /></label><label>Orçamento mensal (R$)<input type="number" min="0" step="0.01" name="monthlyBudget" value="${state.settings.monthlyBudget}" /></label><label>Tema<select name="theme"><option value="light" ${state.settings.theme==='light'?'selected':''}>Claro</option><option value="dark" ${state.settings.theme==='dark'?'selected':''}>Escuro</option></select></label><div class="form-actions"><button type="button" class="btn danger" data-action="reset-demo">Restaurar demonstração</button><button type="submit" class="btn primary">Salvar configurações</button></div></form></section><section class="panel" style="margin-top:16px"><div class="panel-header"><div><p class="eyebrow">ARQUITETURA</p><h3>Status da integração</h3></div>${badge('Modo local','info')}</div><p class="muted">Esta primeira versão funciona com armazenamento local no navegador. O repositório inclui o esquema SQL completo para ativar o Supabase com autenticação, RLS e armazenamento de documentos.</p></section>`;
+  $('#page-content').innerHTML = `<div class="toolbar"><div><h3 style="margin:0">Configurações</h3><p class="muted" style="margin:5px 0 0">Dados da unidade, orçamento e armazenamento.</p></div></div><section class="panel"><form id="settings-form" class="form-grid" style="padding:0"><label>Empresa<input name="company" value="${escapeHtml(state.settings.company)}" /></label><label>Unidade / base<input name="unit" value="${escapeHtml(state.settings.unit)}" /></label><label>Orçamento mensal (R$)<input type="number" min="0" step="0.01" name="monthlyBudget" value="${state.settings.monthlyBudget}" /></label><label>Tema<select name="theme"><option value="light" ${state.settings.theme==='light'?'selected':''}>Claro</option><option value="dark" ${state.settings.theme==='dark'?'selected':''}>Escuro</option></select></label><div class="form-actions"><button type="button" class="btn" data-action="refresh-data">Atualizar dados</button><button type="submit" class="btn primary">Salvar configurações</button></div></form></section><section class="panel" style="margin-top:16px"><div class="panel-header"><div><p class="eyebrow">ARQUITETURA</p><h3>Status da integração</h3></div>${badge('Supabase conectado','success')}</div><p class="muted">Banco, autenticação, auditoria e armazenamento de documentos estão conectados ao Supabase. Todas as alterações são persistidas na nuvem.</p></section>`;
 }
 
 const formSchemas = {
@@ -292,12 +384,12 @@ const formSchemas = {
   },
   course: {
     title: 'Curso / certificado', collection: 'courses', fields: [
-      ['employee','Funcionário','select',true,()=>state.employees.map(x=>x.name)], ['employeeRegistration','Matrícula','text',true], ['course','Curso / treinamento','text',true], ['institution','Instituição','text',true], ['completedAt','Data de realização','date',true], ['expiresAt','Validade','date',true], ['hours','Carga horária','number',true], ['certificate','Nome do certificado','text',false]
+      ['employee','Funcionário','select',true,()=>state.employees.map(x=>x.name)], ['employeeRegistration','Matrícula','text',true], ['course','Curso / treinamento','text',true], ['institution','Instituição','text',true], ['completedAt','Data de realização','date',true], ['expiresAt','Validade','date',true], ['hours','Carga horária','number',true], ['certificate','Arquivo atual','text',false], ['certificateFile','Enviar certificado','file',false]
     ]
   },
   expense: {
     title: 'Lançamento de gasto', collection: 'expenses', fields: [
-      ['date','Data','date',true], ['description','Descrição','text',true], ['category','Categoria','select',true,['EPI','Manutenção','Treinamentos','Combustível','Serviços','Outros']], ['costCenter','Centro de custo','text',true], ['supplier','Fornecedor','text',true], ['document','Nota / documento','text',false], ['value','Valor (R$)','number',true], ['status','Status','select',true,['Previsto','Solicitado','Aguardando aprovação','Aprovado','Pago','Cancelado']]
+      ['date','Data','date',true], ['description','Descrição','text',true], ['category','Categoria','select',true,['EPI','Manutenção','Treinamentos','Combustível','Serviços','Outros']], ['costCenter','Centro de custo','text',true], ['supplier','Fornecedor','text',true], ['document','Nota / documento','text',false], ['value','Valor (R$)','number',true], ['attachmentFile','Anexar comprovante','file',false], ['status','Status','select',true,['Previsto','Solicitado','Aguardando aprovação','Aprovado','Pago','Cancelado']]
     ]
   },
   forklift: {
@@ -317,6 +409,7 @@ function formField([name,label,type,required,options], value = '') {
     const items = typeof options === 'function' ? options() : options;
     return `<label>${label}<select name="${name}" ${required?'required':''}><option value="">Selecione</option>${items.map(item=>`<option value="${escapeHtml(item)}" ${String(value)===String(item)?'selected':''}>${escapeHtml(item)}</option>`).join('')}</select></label>`;
   }
+  if (type === 'file') return `<label>${label}<input name="${name}" type="file" accept=".pdf,.jpg,.jpeg,.png" ${required?'required':''} /></label>`;
   return `<label>${label}<input name="${name}" type="${type}" ${type==='number'?'step="0.01"':''} value="${escapeHtml(value)}" ${required?'required':''} /></label>`;
 }
 
@@ -340,7 +433,7 @@ function openForm(type, id = '') {
     const forklift = state.forklifts.find(x=>x.id===id);
     $('#modal-kicker').textContent = 'ORDEM DE SERVIÇO'; $('#modal-title').textContent = `Manutenção — ${forklift.code}`;
     form.dataset.type = type; form.dataset.id = id;
-    form.innerHTML = `${formField(['type','Tipo','select',true,['Preventiva','Corretiva','Inspeção']])}${formField(['priority','Prioridade','select',true,['Baixa','Média','Alta','Crítica']])}${formField(['openedAt','Data de abertura','date',true],todayISO())}<label>Status<select name="status" required><option>Aberta</option><option>Em andamento</option><option>Aguardando peça</option><option>Concluída</option></select></label><label class="span-2">Descrição<textarea name="description" required></textarea></label>${formField(['cost','Custo previsto','number',true],0)}<div class="form-actions"><button type="button" class="btn" data-action="close-modal">Cancelar</button><button type="submit" class="btn primary">Abrir ordem</button></div>`;
+    form.innerHTML = `${formField(['type','Tipo','select',true,['Preventiva','Corretiva','Inspeção']])}${formField(['priority','Prioridade','select',true,['Baixa','Média','Alta','Crítica']])}${formField(['openedAt','Data de abertura','date',true],todayISO())}<label>Status<select name="status" required><option>Aberta</option><option>Em andamento</option><option>Aguardando peça</option><option>Concluída</option></select></label><label class="span-2">Descrição<textarea name="description" required></textarea></label>${formField(['cost','Custo previsto','number',true],0)}${formField(['attachmentFile','Anexar documento','file',false])}<div class="form-actions"><button type="button" class="btn" data-action="close-modal">Cancelar</button><button type="submit" class="btn primary">Abrir ordem</button></div>`;
   } else if (type === 'checklist') {
     const forklift = state.forklifts.find(x=>x.id===id);
     const items = ['Pneus e rodas','Garfos e trava','Correntes e mastro','Freios','Buzina','Luzes e sinalização','Vazamentos','Cinto de segurança','Extintor','Bateria / combustível'];
@@ -353,62 +446,41 @@ function openForm(type, id = '') {
 
 function closeModal() { $('#modal').classList.add('hidden'); }
 
-function handleFormSubmit(event) {
+async function handleFormSubmit(event) {
   event.preventDefault();
-  const form = event.target;
-  const data = Object.fromEntries(new FormData(form));
-  const type = form.dataset.type;
-  const id = form.dataset.id;
-  const schema = formSchemas[type];
-  if (schema) {
-    const numeric = ['stock','minimum','unitCost','hours','value','year','hourMeter','maintenanceHour','participants','duration'];
-    numeric.forEach(key => { if (key in data) data[key] = Number(data[key]); });
-    if (type === 'course') {
-      const employee = state.employees.find(x=>x.name===data.employee);
-      if (employee) data.employeeRegistration = employee.registration;
+  const form=event.target; const data=Object.fromEntries(new FormData(form)); const type=form.dataset.type; const id=form.dataset.id; const schema=formSchemas[type];
+  try {
+    const numeric=['stock','minimum','unitCost','hours','value','year','hourMeter','maintenanceHour','participants','duration']; numeric.forEach(k=>{if(k in data)data[k]=Number(data[k]);});
+    if(type==='course') { const employee=state.employees.find(x=>x.name===data.employee); if(employee)data.employeeRegistration=employee.registration; const path=await uploadFromForm(form,'certificateFile','certificates'); if(path)data.certificate=path; delete data.certificateFile; }
+    if(type==='expense') { const path=await uploadFromForm(form,'attachmentFile','expenses'); if(path)data.attachment=path; delete data.attachmentFile; }
+    if(schema){ if(id){ const idx=state[schema.collection].findIndex(x=>x.id===id); state[schema.collection][idx]={...state[schema.collection][idx],...data}; } else state[schema.collection].unshift({id:crypto.randomUUID(),...data}); await syncState(`${schema.title} salvo: ${data.name||data.description||data.course||data.code||data.theme}`); toast('Registro salvo com sucesso.'); }
+    else if(type==='delivery'){
+      const epi=state.epis.find(x=>x.id===id); const employee=state.employees.find(x=>x.name===data.employee); const qty=Number(data.quantity); if(!employee) throw new Error('Funcionário não encontrado');
+      const q=await db.rpc('register_epi_delivery',{p_epi_id:epi.id,p_employee_id:employee.id,p_quantity:qty,p_reason:data.reason,p_movement_date:data.date,p_signed:data.signed==='Sim'}); if(q.error) throw q.error; await loadData(); toast('Entrega registrada e estoque atualizado.');
+    } else if(type==='maintenance'){
+      const forklift=state.forklifts.find(x=>x.id===id); const path=await uploadFromForm(form,'attachmentFile','maintenance'); state.maintenances.unshift({id:crypto.randomUUID(),forkliftId:forklift.id,forklift:forklift.code,type:data.type,priority:data.priority,openedAt:data.openedAt,description:data.description,status:data.status,cost:Number(data.cost),attachment:path}); forklift.status=data.type==='Corretiva'?'Manutenção corretiva':'Manutenção programada'; await syncState(`Ordem de serviço aberta para ${forklift.code}`); toast('Ordem de serviço aberta.');
+    } else if(type==='checklist'){
+      const forklift=state.forklifts.find(x=>x.id===id); const items=Object.entries(data).filter(([k])=>k.startsWith('item_')).map(([k,v],i)=>({item:i+1,status:v})); const failed=items.filter(i=>i.status==='Não conforme').length;
+      const q=await db.from('forklift_checklists').insert({forklift_id:forklift.id,inspection_date:data.date,shift:data.shift,hour_meter:Number(forklift.hourMeter),items,has_critical_failure:failed>0,notes:data.notes||null,inspected_by:currentUser.id}); if(q.error) throw q.error;
+      if(failed>0){ const u=await db.from('forklifts').update({status:'interdicted'}).eq('id',forklift.id); if(u.error) throw u.error; }
+      await db.from('audit_logs').insert({user_id:currentUser.id,action:`Checklist realizado em ${forklift.code}`,entity_type:'forklift',entity_id:forklift.id}); await loadData(); toast(failed?'Checklist salvo. Equipamento interditado.':'Checklist aprovado.');
     }
-    if (id) {
-      const idx = state[schema.collection].findIndex(x=>x.id===id);
-      state[schema.collection][idx] = { ...state[schema.collection][idx], ...data };
-      saveState(`${schema.title} atualizado: ${data.name || data.description || data.course || data.code || data.theme}`);
-    } else {
-      state[schema.collection].unshift({ id: crypto.randomUUID(), ...data });
-      saveState(`${schema.title} cadastrado: ${data.name || data.description || data.course || data.code || data.theme}`);
-    }
-    toast('Registro salvo com sucesso.');
-  } else if (type === 'delivery') {
-    const epi = state.epis.find(x=>x.id===id);
-    const qty = Number(data.quantity);
-    if (qty <= 0 || qty > Number(epi.stock)) return toast('Quantidade inválida ou acima do estoque.');
-    epi.stock = Number(epi.stock) - qty;
-    state.epiDeliveries.unshift({ id: crypto.randomUUID(), epiId: epi.id, epi: epi.name, employee: data.employee, quantity: qty, date: data.date, reason: data.reason, signed: data.signed === 'Sim' });
-    saveState(`EPI entregue: ${epi.name} para ${data.employee}`);
-    toast('Entrega registrada e estoque atualizado.');
-  } else if (type === 'maintenance') {
-    const forklift = state.forklifts.find(x=>x.id===id);
-    state.maintenances.unshift({ id: crypto.randomUUID(), forklift: forklift.code, type: data.type, priority: data.priority, openedAt: data.openedAt, description: data.description, status: data.status, cost: Number(data.cost) });
-    forklift.status = data.type === 'Corretiva' ? 'Manutenção corretiva' : 'Manutenção programada';
-    saveState(`Ordem de serviço aberta para ${forklift.code}`);
-    toast('Ordem de serviço aberta.');
-  } else if (type === 'checklist') {
-    const forklift = state.forklifts.find(x=>x.id===id);
-    const failed = Object.entries(data).filter(([key,value])=>key.startsWith('item_') && value === 'Não conforme').length;
-    state.checklists.unshift({ id: crypto.randomUUID(), forklift: forklift.code, date: data.date, shift: data.shift, failed, notes: data.notes });
-    if (failed > 0) forklift.status = 'Interditada';
-    saveState(`Checklist realizado em ${forklift.code}${failed ? ` com ${failed} não conformidade(s)` : ''}`);
-    toast(failed ? 'Checklist salvo. Equipamento interditado por não conformidade.' : 'Checklist aprovado.');
-  }
-  closeModal();
-  renderPage();
+    closeModal(); renderPage();
+  } catch(error){ console.error(error); toast(error.message||'Não foi possível salvar.'); }
 }
 
-function deleteRecord(collection, id) {
-  const record = state[collection].find(x=>x.id===id);
-  if (!record || !confirm('Confirma a remoção deste registro?')) return;
-  state[collection] = state[collection].filter(x=>x.id!==id);
-  saveState(`Registro removido de ${collection}`);
-  toast('Registro removido.');
-  renderPage();
+async function deleteRecord(collection,id){
+  if(!confirm('Confirma o arquivamento deste registro?')) return;
+  try{
+    let q;
+    if(collection==='employees') q=await db.from('employees').update({archived_at:new Date().toISOString(),status:'terminated'}).eq('id',id);
+    else if(collection==='epis') q=await db.from('epi_catalog').update({status:'archived'}).eq('id',id);
+    else if(collection==='courses') q=await db.from('employee_trainings').delete().eq('id',id);
+    else if(collection==='expenses') q=await db.from('expenses').update({archived_at:new Date().toISOString()}).eq('id',id);
+    else if(collection==='forklifts') q=await db.from('forklifts').update({archived_at:new Date().toISOString(),status:'retired'}).eq('id',id);
+    else if(collection==='dds') q=await db.from('dds_sessions').delete().eq('id',id);
+    if(q?.error) throw q.error; await db.from('audit_logs').insert({user_id:currentUser.id,action:`Registro arquivado em ${collection}`,entity_type:collection,entity_id:id}); await loadData(); renderPage(); toast('Registro arquivado.');
+  }catch(error){console.error(error);toast(error.message||'Não foi possível arquivar.');}
 }
 
 function csvEscape(value) { return `"${String(value ?? '').replaceAll('"','""')}"`; }
@@ -429,61 +501,46 @@ function exportData(type) {
 }
 
 function bindEvents() {
-  document.addEventListener('click', (event) => {
-    const pageEl = event.target.closest('[data-page]');
-    if (pageEl) return setPage(pageEl.dataset.page);
-    const actionEl = event.target.closest('[data-action]');
-    if (!actionEl) return;
-    const action = actionEl.dataset.action;
-    if (action === 'open-form') openForm(actionEl.dataset.form, actionEl.dataset.id || '');
-    if (action === 'close-modal') closeModal();
-    if (action === 'delete') deleteRecord(actionEl.dataset.collection, actionEl.dataset.id);
-    if (action === 'export') exportData(actionEl.dataset.export);
-    if (action === 'approve-expense') {
-      const item = state.expenses.find(x=>x.id===actionEl.dataset.id); item.status = 'Aprovado'; saveState(`Gasto aprovado: ${item.description}`); toast('Gasto aprovado.'); renderPage();
-    }
-    if (action === 'complete-dds') {
-      const item = state.dds.find(x=>x.id===actionEl.dataset.id); const count = Number(prompt('Quantidade de participantes:', '10')); if (!Number.isFinite(count)) return; item.participants = count; item.status = 'Concluído'; saveState(`DDS concluído: ${item.theme}`); toast('DDS concluído.'); renderPage();
-    }
-    if (action === 'reset-demo' && confirm('Restaurar todos os dados de demonstração?')) { state = structuredClone(seedState); saveState('Base demonstrativa restaurada'); applyTheme(); renderPage(); toast('Demonstração restaurada.'); }
+  document.addEventListener('click', async (event) => {
+    const pageEl=event.target.closest('[data-page]'); if(pageEl)return setPage(pageEl.dataset.page);
+    const actionEl=event.target.closest('[data-action]'); if(!actionEl)return; const action=actionEl.dataset.action;
+    if(action==='open-form')openForm(actionEl.dataset.form,actionEl.dataset.id||'');
+    if(action==='close-modal')closeModal();
+    if(action==='delete')await deleteRecord(actionEl.dataset.collection,actionEl.dataset.id);
+    if(action==='export')exportData(actionEl.dataset.export);
+    if(action==='approve-expense')try{const item=state.expenses.find(x=>x.id===actionEl.dataset.id);item.status='Aprovado';await syncState(`Gasto aprovado: ${item.description}`);toast('Gasto aprovado.');renderPage();}catch(e){toast(e.message);}
+    if(action==='complete-dds')try{const item=state.dds.find(x=>x.id===actionEl.dataset.id);const count=Number(prompt('Quantidade de participantes:','10'));if(!Number.isFinite(count))return;item.participants=count;item.status='Concluído';await syncState(`DDS concluído: ${item.theme}`);toast('DDS concluído.');renderPage();}catch(e){toast(e.message);}
+    if(action==='refresh-data'){try{await loadData();renderPage();toast('Dados atualizados.');}catch(e){toast(e.message);}}
   });
-  document.addEventListener('input', (event) => {
-    if (event.target.id === 'table-search') { tableSearch = event.target.value; renderPage(); setTimeout(()=>$('#table-search')?.focus(),0); }
-  });
-  document.addEventListener('change', (event) => {
-    if (event.target.id === 'table-filter') { tableFilter = event.target.value; renderPage(); }
-  });
-  $('#modal-form').addEventListener('submit', handleFormSubmit);
-  $('#modal-close').addEventListener('click', closeModal);
-  $('#modal').addEventListener('click', e => { if (e.target.id === 'modal') closeModal(); });
-  $('#menu-btn').addEventListener('click', () => $('#sidebar').classList.toggle('open'));
-  $('#notification-btn').addEventListener('click', () => setPage('notifications'));
-  $('#theme-btn').addEventListener('click', () => { state.settings.theme = state.settings.theme === 'dark' ? 'light' : 'dark'; saveState('Tema alterado'); applyTheme(); });
-  $('#logout-btn').addEventListener('click', logout);
-  $('#global-search').addEventListener('keydown', e => { if (e.key === 'Enter') { tableSearch = e.target.value; setPage('employees'); } });
-  document.addEventListener('submit', event => {
-    if (event.target.id === 'settings-form') {
-      event.preventDefault(); const data = Object.fromEntries(new FormData(event.target)); state.settings = { ...state.settings, ...data, monthlyBudget: Number(data.monthlyBudget) }; saveState('Configurações atualizadas'); applyTheme(); toast('Configurações salvas.'); renderPage();
-    }
-  });
+  document.addEventListener('input',event=>{if(event.target.id==='table-search'){tableSearch=event.target.value;renderPage();setTimeout(()=>$('#table-search')?.focus(),0);}});
+  document.addEventListener('change',event=>{if(event.target.id==='table-filter'){tableFilter=event.target.value;renderPage();}});
+  $('#modal-form').addEventListener('submit',handleFormSubmit); $('#modal-close').addEventListener('click',closeModal); $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();});
+  $('#menu-btn').addEventListener('click',()=>$('#sidebar').classList.toggle('open')); $('#notification-btn').addEventListener('click',()=>setPage('notifications'));
+  $('#theme-btn').addEventListener('click',()=>{state.settings.theme=state.settings.theme==='dark'?'light':'dark';localStorage.setItem('gst-theme',state.settings.theme);applyTheme();});
+  $('#logout-btn').addEventListener('click',logout); $('#global-search').addEventListener('keydown',e=>{if(e.key==='Enter'){tableSearch=e.target.value;setPage('employees');}});
+  document.addEventListener('submit',async event=>{if(event.target.id==='settings-form'){event.preventDefault();try{const data=Object.fromEntries(new FormData(event.target));state.settings={...state.settings,...data,monthlyBudget:Number(data.monthlyBudget)};await syncState('Configurações atualizadas');applyTheme();toast('Configurações salvas.');renderPage();}catch(e){toast(e.message);}}});
 }
 
-function applyTheme() { document.documentElement.dataset.theme = state.settings.theme || 'light'; }
+function applyTheme(){document.documentElement.dataset.theme=state.settings.theme||'light';}
+function setAuthMode(mode){authMode=mode;const signup=mode==='signup';$('#login-name').classList.toggle('hidden',!signup);$('#login-submit').textContent=signup?'Criar administrador':'Entrar';$('#signup-toggle').textContent=signup?'Já tenho uma conta':'Primeiro acesso: criar administrador';$('#auth-help').textContent=signup?'O primeiro usuário cadastrado recebe perfil de administrador.':'Entre com sua conta do Gestão Segura.';}
 
-function login(event) {
-  event?.preventDefault();
-  const email = $('#login-email').value;
-  const password = $('#login-password').value;
-  if (email !== 'admin@gestaosegura.local' || password !== 'admin123') return toast('E-mail ou senha inválidos.');
-  localStorage.setItem(SESSION_KEY, JSON.stringify({ email, name: 'João Victor', role: 'Administrador' }));
-  showApp();
+async function login(event){
+  event?.preventDefault(); const email=$('#login-email').value.trim(); const password=$('#login-password').value; const button=$('#login-submit'); button.disabled=true;
+  try{
+    if(authMode==='signup'){
+      const name=$('#login-name-input').value.trim(); if(!name)throw new Error('Informe seu nome completo.');
+      const response=await fetch(`${SUPABASE_URL}/functions/v1/bootstrap-admin`,{method:'POST',headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY},body:JSON.stringify({fullName:name,email,password})});
+      const payload=await response.json().catch(()=>({})); if(!response.ok)throw new Error(payload.error||'Não foi possível criar o administrador.');
+      const result=await db.auth.signInWithPassword({email,password}); if(result.error)throw result.error;
+    }else{const result=await db.auth.signInWithPassword({email,password});if(result.error)throw result.error;}
+  }catch(error){console.error(error);toast(error.message||'Falha na autenticação.');}finally{button.disabled=false;}
 }
-function logout() { localStorage.removeItem(SESSION_KEY); $('#app').classList.add('hidden'); $('#login-screen').classList.remove('hidden'); }
-function showApp() { $('#login-screen').classList.add('hidden'); $('#app').classList.remove('hidden'); applyTheme(); setupNav(); renderPage(); }
+async function logout(){await db.auth.signOut();$('#app').classList.add('hidden');$('#login-screen').classList.remove('hidden');state=structuredClone(emptyState);}
+async function showApp(session){currentUser=session.user;$('#login-screen').classList.add('hidden');$('#app').classList.remove('hidden');applyTheme();setupNav();$('#page-content').innerHTML='<div class="empty">Carregando dados...</div>';try{await loadData();renderPage();}catch(error){console.error(error);toast(error.message||'Erro ao carregar dados.');}}
+async function recoverPassword(){const email=$('#login-email').value.trim();if(!email)return toast('Informe seu e-mail.');const result=await db.auth.resetPasswordForEmail(email,{redirectTo:location.origin+location.pathname});toast(result.error?result.error.message:'E-mail de recuperação enviado.');}
 
-$('#login-form').addEventListener('submit', login);
-$('#demo-login').addEventListener('click', () => { $('#login-email').value='admin@gestaosegura.local'; $('#login-password').value='admin123'; login(); });
-bindEvents();
-if (localStorage.getItem(SESSION_KEY)) showApp();
-
-if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('./service-worker.js').catch(()=>{});
+$('#login-form').addEventListener('submit',login); $('#signup-toggle').addEventListener('click',()=>setAuthMode(authMode==='login'?'signup':'login')); $('#forgot-password').addEventListener('click',recoverPassword);
+bindEvents(); setAuthMode('login');
+db.auth.onAuthStateChange(async(event,session)=>{if(event==='PASSWORD_RECOVERY'){const password=prompt('Digite sua nova senha (mínimo 8 caracteres):');if(password){const r=await db.auth.updateUser({password});toast(r.error?r.error.message:'Senha atualizada.');}} if(session)await showApp(session);else{$('#app').classList.add('hidden');$('#login-screen').classList.remove('hidden');}});
+db.auth.getSession().then(({data})=>{if(data.session)showApp(data.session);});
+if('serviceWorker'in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('./service-worker.js').catch(()=>{});

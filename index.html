@@ -27,12 +27,14 @@
     <form id="login-form" class="login-card">
       <div class="brand-row"><div class="brand-mark">GS</div><div><strong>Gestão Segura</strong><small>SST & Operações</small></div></div>
       <h2>Entrar no sistema</h2>
-      <p class="muted">Use o acesso de demonstração para validar a primeira versão.</p>
-      <label>E-mail<input id="login-email" type="email" value="admin@gestaosegura.local" required /></label>
-      <label>Senha<input id="login-password" type="password" value="admin123" required /></label>
-      <button class="btn primary full" type="submit">Entrar</button>
-      <button id="demo-login" class="btn ghost full" type="button">Entrar em modo demonstração</button>
-      <small class="muted">Acesso demo: admin@gestaosegura.local / admin123</small>
+      <p class="muted">Entre com sua conta ou crie o primeiro administrador.</p>
+      <label id="login-name" class="hidden">Nome completo<input id="login-name-input" type="text" autocomplete="name" /></label>
+      <label>E-mail<input id="login-email" type="email" autocomplete="email" required /></label>
+      <label>Senha<input id="login-password" type="password" minlength="8" autocomplete="current-password" required /></label>
+      <button id="login-submit" class="btn primary full" type="submit">Entrar</button>
+      <button id="signup-toggle" class="btn ghost full" type="button">Primeiro acesso: criar administrador</button>
+      <button id="forgot-password" class="btn ghost full" type="button">Esqueci minha senha</button>
+      <small id="auth-help" class="muted">Entre com sua conta do Gestão Segura.</small>
     </form>
   </section>
 
@@ -71,6 +73,8 @@
     </div>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
   <script src="app.js" defer></script>
 </body>
 </html>

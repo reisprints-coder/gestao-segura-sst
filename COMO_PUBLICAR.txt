@@ -1,0 +1,9 @@
+1. Extraia esta pasta no computador.
+2. Dê dois cliques em PUBLICAR_NO_GITHUB.bat.
+3. O script enviará a versão final para o repositório.
+4. Aguarde a ação "Publicar Gestão Segura SST" concluir no GitHub.
+5. Abra: https://reisprints-coder.github.io/gestao-segura-sst/
+6. Clique em "Primeiro acesso: criar administrador".
+7. Cadastre seu nome, e-mail e uma senha com pelo menos 8 caracteres.
+
+Observação: o banco Supabase e a função de criação do primeiro administrador já estão prontos.
