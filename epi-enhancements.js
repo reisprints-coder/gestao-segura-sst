@@ -210,50 +210,21 @@
       const quantity = Number(data.quantity);
       if (!epi || !Number.isFinite(quantity) || quantity <= 0) throw new Error('Informe um EPI e uma quantidade válida.');
 
-      let batchId = epi.batchId;
-      if (batchId) {
-        const batch = lookups.batches.find(item => item.id === batchId);
-        const update = await db.from('epi_batches').update({
-          current_quantity: Number(epi.stock) + quantity,
-          supplier: data.supplier || batch?.supplier || null,
-          invoice_number: data.invoiceNumber || batch?.invoice_number || null,
-          unit_cost: Number(data.unitCost || epi.unitCost || 0)
-        }).eq('id', batchId);
-        if (update.error) throw update.error;
-      } else {
-        batchId = crypto.randomUUID();
-        const insertBatch = await db.from('epi_batches').insert({
-          id: batchId,
-          epi_id: epi.id,
-          batch_number: data.batchReference || `APP-${epi.code}`,
-          supplier: data.supplier || null,
-          invoice_number: data.invoiceNumber || null,
-          received_at: data.receivedAt,
-          initial_quantity: quantity,
-          current_quantity: quantity,
-          unit_cost: Number(data.unitCost || epi.unitCost || 0),
-          created_by: currentUser.id
-        });
-        if (insertBatch.error) throw insertBatch.error;
-      }
+      const unitCost = Number(data.unitCost || 0);
+      if (!Number.isFinite(unitCost) || unitCost < 0) throw new Error('Informe um custo unitário válido.');
 
-      const movement = await db.from('epi_movements').insert({
-        epi_id: epi.id,
-        batch_id: batchId,
-        movement_type: 'entry',
-        quantity,
-        reason: [data.batchReference && `Lote ${data.batchReference}`, data.invoiceNumber && `Documento ${data.invoiceNumber}`, data.notes].filter(Boolean).join(' • ') || 'Entrada de estoque',
-        movement_at: `${data.receivedAt}T12:00:00Z`,
-        created_by: currentUser.id
+      const entry = await db.rpc('register_epi_inventory_entry', {
+        p_epi_id: epi.id,
+        p_quantity: quantity,
+        p_received_at: data.receivedAt,
+        p_batch_number: data.batchReference || null,
+        p_supplier: data.supplier || null,
+        p_invoice_number: data.invoiceNumber || null,
+        p_unit_cost: unitCost,
+        p_notes: data.notes || null
       });
-      if (movement.error) throw movement.error;
+      if (entry.error) throw entry.error;
 
-      if (Number(data.unitCost) >= 0) {
-        const catalogUpdate = await db.from('epi_catalog').update({ unit_cost: Number(data.unitCost || epi.unitCost || 0), updated_by: currentUser.id }).eq('id', epi.id);
-        if (catalogUpdate.error) throw catalogUpdate.error;
-      }
-
-      await db.from('audit_logs').insert({ user_id: currentUser.id, action: `Entrada de ${quantity} unidade(s) em ${epi.code}`, entity_type: 'epi', entity_id: epi.id });
       await loadData();
       closeModal();
       renderPage();
