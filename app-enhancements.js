@@ -86,7 +86,6 @@
     ['epi-registration', uiIcon('hardHat'), 'Cadastro de EPI'],
     ['epi-inventory', uiIcon('package'), 'Inventário de EPI'],
     ['courses', uiIcon('graduation'), 'Cursos e documentos'],
-    ['expenses', uiIcon('wallet'), 'Controle de gastos'],
     ['forklifts', uiIcon('forklift'), 'Empilhadeiras'],
     ['daily-checklist', uiIcon('clipboard'), 'Checklist Diário'],
     ['dds', uiIcon('message'), 'DDS'],
