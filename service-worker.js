@@ -1,7 +1,7 @@
-const CACHE = 'gestao-segura-v8-workforce';
+const CACHE = 'gestao-segura-v9-dashboard-inventory';
 const ASSETS = [
-  './','./index.html','./styles.css','./admin-users.css','./workforce-controls.css',
-  './app.js','./app-enhancements.js','./epi-signature.js','./admin-users.js','./workforce-controls.js',
+  './','./index.html','./styles.css','./enhancements.css','./admin-users.css','./workforce-controls.css',
+  './app.js','./app-enhancements.js','./epi-enhancements.js','./epi-signature.js','./admin-users.js','./workforce-controls.js',
   './config.js','./manifest.webmanifest'
 ];
 self.addEventListener('install',event=>{self.skipWaiting();event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS)))});
