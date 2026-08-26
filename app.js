@@ -282,23 +282,41 @@ function renderDashboard() {
   const availableForklifts = state.forklifts.filter(x => ['Operando','Disponível'].includes(x.status)).length;
   const ddsMonth = state.dds.filter(x => x.date.slice(0,7) === todayISO().slice(0,7) && x.status === 'Concluído').length;
   const notifications = getNotifications().slice(0, 6);
-  const monthlyData = [18.2, 21.5, 16.8, 24.1, 19.7, Math.max(monthExpenses / 1000, 1)];
-  const labels = ['Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul'];
+  const monthFormatter = new Intl.DateTimeFormat('pt-BR', { month: 'short' });
+  const monthKeys = Array.from({ length: 6 }, (_, index) => {
+    const date = new Date();
+    date.setDate(1);
+    date.setMonth(date.getMonth() - (5 - index));
+    return {
+      key: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`,
+      label: monthFormatter.format(date).replace('.', '').replace(/^./, char => char.toUpperCase())
+    };
+  });
+  const monthlyData = monthKeys.map(month => state.expenses
+    .filter(expense => String(expense.date || '').slice(0, 7) === month.key)
+    .reduce((sum, expense) => sum + Number(expense.value || 0), 0));
+  const maxMonthlyExpense = Math.max(...monthlyData, 1);
+  const userName = state.profile?.full_name || currentUser?.email?.split('@')[0] || 'Usuário';
+  const firstName = userName.trim().split(/\s+/)[0];
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? 'Bom dia' : hour < 18 ? 'Boa tarde' : 'Boa noite';
+  const budget = Number(state.settings.monthlyBudget || 0);
+  const budgetPercentage = budget > 0 ? Math.round(monthExpenses / budget * 100) : 0;
 
   $('#page-content').innerHTML = `
-    <div class="toolbar"><div><h3 style="margin:0">Bom dia, João Victor</h3><p class="muted" style="margin:5px 0 0">Acompanhe os indicadores críticos da operação.</p></div><div class="toolbar-right"><button class="btn" data-action="export" data-export="dashboard">Exportar resumo</button><button class="btn primary" data-page="notifications">Ver alertas</button></div></div>
+    <div class="toolbar"><div><h3 style="margin:0">${greeting}, ${escapeHtml(firstName)}</h3><p class="muted" style="margin:5px 0 0">Acompanhe os indicadores críticos da operação.</p></div><div class="toolbar-right"><button class="btn" data-action="export" data-export="dashboard">Exportar resumo</button><button class="btn primary" data-page="notifications">Ver alertas</button></div></div>
     <div class="metrics">
       ${metric('Funcionários ativos', activeEmployees, '◎', `${state.employees.length} cadastrados`)}
       ${metric('EPIs com estoque baixo', lowStock, '⬡', lowStock ? 'Ação necessária' : 'Estoque regular', !lowStock)}
       ${metric('Cursos vencidos', expiredCourses, '▤', expiredCourses ? 'Regularizar' : 'Conformidade total', !expiredCourses)}
-      ${metric('Gastos no mês', currency(monthExpenses), 'R$', `${Math.round(monthExpenses / state.settings.monthlyBudget * 100)}% do orçamento`, monthExpenses <= state.settings.monthlyBudget)}
+      ${metric('Gastos no mês', currency(monthExpenses), 'R$', budget > 0 ? `${budgetPercentage}% do orçamento` : 'Orçamento não definido', budget === 0 || monthExpenses <= budget)}
       ${metric('Empilhadeiras operacionais', `${availableForklifts}/${state.forklifts.length}`, '▰', `${state.forklifts.filter(x=>x.status==='Interditada').length} interditada(s)`, availableForklifts === state.forklifts.length)}
       ${metric('DDS realizados no mês', ddsMonth, '◉', `${state.dds.reduce((s,x)=>s+Number(x.participants),0)} participações`)}
       ${metric('Ordens de manutenção', state.maintenances.length, '⚒', `${state.maintenances.filter(x=>x.status!=='Concluída').length} abertas`, false)}
       ${metric('Alertas ativos', getNotifications().length, '♢', 'Central de notificações', getNotifications().length === 0)}
     </div>
     <div class="dashboard-grid">
-      <section class="panel"><div class="panel-header"><div><p class="eyebrow">FINANCEIRO</p><h3>Evolução de gastos mensais</h3></div><strong>${currency(monthExpenses)}</strong></div><div class="bars">${monthlyData.map((value,i)=>`<div class="bar-wrap"><div class="bar" title="${currency(value*1000)}" style="height:${Math.max(8, Math.min(100, value/30*100))}%"></div><small>${labels[i]}</small></div>`).join('')}</div></section>
+      <section class="panel"><div class="panel-header"><div><p class="eyebrow">FINANCEIRO</p><h3>Evolução de gastos mensais</h3></div><strong>${currency(monthExpenses)}</strong></div><div class="bars">${monthlyData.map((value,i)=>`<div class="bar-wrap"><div class="bar" title="${currency(value)}" style="height:${value > 0 ? Math.max(8, value / maxMonthlyExpense * 100) : 2}%"></div><small>${monthKeys[i].label}</small></div>`).join('')}</div></section>
       <section class="panel"><div class="panel-header"><div><p class="eyebrow">ATENÇÃO</p><h3>Alertas prioritários</h3></div><button class="btn small" data-page="notifications">Todos</button></div><div class="alert-list">${notifications.length ? notifications.map(n=>`<button class="alert-item" data-page="${n.page}" style="border:0;text-align:left;color:inherit"><span class="alert-dot">${n.severity === 'danger' ? '!' : '•'}</span><span><strong>${escapeHtml(n.title)}</strong><small>${escapeHtml(n.detail)}</small></span>${badge(n.type, n.severity)}</button>`).join('') : '<div class="empty">Nenhum alerta ativo.</div>'}</div></section>
     </div>`;
 }
