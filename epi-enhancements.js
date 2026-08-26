@@ -239,7 +239,6 @@
 
   function addMissingDeleteButtons() {
     const configs = {
-      expenses: ['expense', 'expenses', 'Excluir'],
       forklifts: ['forklift', 'forklifts', 'Arquivar'],
       dds: ['dds', 'dds', 'Excluir']
     };
