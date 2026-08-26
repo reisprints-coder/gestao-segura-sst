@@ -7,7 +7,6 @@ Site app independente para controle de saúde, segurança e apoio operacional.
 - Funcionários e situação funcional
 - Estoque, validade de CA e entrega de EPI
 - Cursos, certificados e vencimentos
-- Gastos, aprovações e orçamento
 - Empilhadeiras, checklist e ordens de manutenção
 - DDS, programação e participação
 - Dashboard, alertas automáticos, auditoria e exportação CSV
