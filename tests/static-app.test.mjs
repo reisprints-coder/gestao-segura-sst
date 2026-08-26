@@ -10,12 +10,11 @@ test('build contém todos os módulos publicados', async () => {
   }
 });
 
-test('dashboard não contém usuário ou gastos mensais fictícios', async () => {
+test('dashboard usa o usuário conectado e não contém controle de gastos', async () => {
   const app = await readFile('dist/app.js', 'utf8');
   assert.doesNotMatch(app, /Bom dia, João Victor/);
-  assert.doesNotMatch(app, /\[18\.2, 21\.5, 16\.8/);
   assert.match(app, /state\.profile\?\.full_name/);
-  assert.match(app, /state\.expenses/);
+  assert.doesNotMatch(app, /state\.expenses|Controle de gastos|Gastos no mês|monthlyBudget/);
 });
 
 test('configuração pública não expõe chave administrativa', async () => {
