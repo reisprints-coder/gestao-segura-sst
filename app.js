@@ -16,7 +16,6 @@ const navItems = [
   ['employees', '◎', 'Funcionários'],
   ['epis', '⬡', 'Controle de EPI'],
   ['courses', '▤', 'Cursos e documentos'],
-  ['expenses', 'R$', 'Controle de gastos'],
   ['forklifts', '▰', 'Empilhadeiras'],
   ['dds', '◉', 'DDS'],
   ['reports', '▥', 'Relatórios'],
@@ -25,16 +24,14 @@ const navItems = [
 ];
 
 const emptyState = {
-  employees: [], epis: [], epiDeliveries: [], courses: [], expenses: [],
+  employees: [], epis: [], epiDeliveries: [], courses: [],
   forklifts: [], maintenances: [], checklists: [], dds: [], audit: [],
-  settings: { company: 'BR Soluções', unit: 'Porto do Açu — LMP', monthlyBudget: 50000, theme: localStorage.getItem('gst-theme') || 'light' },
+  settings: { company: 'BR Soluções', unit: 'Porto do Açu — LMP', theme: localStorage.getItem('gst-theme') || 'light' },
   profile: null,
 };
 
 const employeeStatus = { active:'Ativo', vacation:'Férias', leave:'Afastado', terminated:'Desligado' };
 const employeeStatusDb = Object.fromEntries(Object.entries(employeeStatus).map(([k,v])=>[v,k]));
-const expenseStatus = { planned:'Previsto', requested:'Solicitado', pending_approval:'Aguardando aprovação', approved:'Aprovado', paid:'Pago', cancelled:'Cancelado' };
-const expenseStatusDb = Object.fromEntries(Object.entries(expenseStatus).map(([k,v])=>[v,k]));
 const forkliftStatus = { available:'Disponível', operating:'Operando', stopped:'Parada', scheduled_maintenance:'Manutenção programada', corrective_maintenance:'Manutenção corretiva', interdicted:'Interditada', retired:'Baixada' };
 const forkliftStatusDb = Object.fromEntries(Object.entries(forkliftStatus).map(([k,v])=>[v,k]));
 const maintenanceType = { preventive:'Preventiva', corrective:'Corretiva', inspection:'Inspeção' };
@@ -45,7 +42,7 @@ const ddsStatus = { scheduled:'Programado', completed:'Concluído', cancelled:'C
 const ddsStatusDb = Object.fromEntries(Object.entries(ddsStatus).map(([k,v])=>[v,k]));
 
 let state = structuredClone(emptyState);
-let lookups = { categories: [], costCenters: [], trainingCatalog: [], batches: [], plans: [] };
+let lookups = { trainingCatalog: [], batches: [], plans: [] };
 let currentUser = null;
 let currentPage = 'dashboard';
 let tableSearch = '';
@@ -75,9 +72,6 @@ async function loadData() {
     db.from('epi_movements').select('*').eq('movement_type','delivery').order('movement_at',{ascending:false}),
     db.from('training_catalog').select('*').order('name'),
     db.from('employee_trainings').select('*').order('expires_at'),
-    db.from('expense_categories').select('*').order('name'),
-    db.from('cost_centers').select('*').order('code'),
-    db.from('expenses').select('*').is('archived_at', null).order('expense_date',{ascending:false}),
     db.from('forklifts').select('*').is('archived_at', null).order('code'),
     db.from('maintenance_plans').select('*'),
     db.from('maintenance_orders').select('*').order('opened_at',{ascending:false}),
@@ -86,7 +80,7 @@ async function loadData() {
     db.from('audit_logs').select('*').order('created_at',{ascending:false}).limit(50),
     db.from('app_settings').select('*').eq('id',1).maybeSingle(),
   ]);
-  const [profileQ, employeesQ, episQ, batchesQ, movementsQ, catalogQ, trainingsQ, categoriesQ, centersQ, expensesQ, forkliftsQ, plansQ, maintenanceQ, checksQ, ddsQ, auditQ, settingsQ] = queries;
+  const [profileQ, employeesQ, episQ, batchesQ, movementsQ, catalogQ, trainingsQ, forkliftsQ, plansQ, maintenanceQ, checksQ, ddsQ, auditQ, settingsQ] = queries;
   if (profileQ.error) throw profileQ.error;
   state.profile = profileQ.data;
   const employees = must(employeesQ,'Funcionários');
@@ -95,40 +89,28 @@ async function loadData() {
   const movements = must(movementsQ,'Movimentações');
   const catalog = must(catalogQ,'Catálogo de cursos');
   const trainings = must(trainingsQ,'Cursos');
-  const categories = must(categoriesQ,'Categorias');
-  const centers = must(centersQ,'Centros de custo');
-  const expenses = must(expensesQ,'Gastos');
   const forklifts = must(forkliftsQ,'Empilhadeiras');
   const plans = must(plansQ,'Planos de manutenção');
   const maintenance = must(maintenanceQ,'Ordens de manutenção');
   const checks = must(checksQ,'Checklists');
   const dds = must(ddsQ,'DDS');
   const audit = must(auditQ,'Auditoria');
-  lookups = { categories, costCenters: centers, trainingCatalog: catalog, batches, plans };
+  lookups = { trainingCatalog: catalog, batches, plans };
 
   state.employees = employees.map(x=>({ id:x.id, name:x.full_name, registration:x.registration, role:x.job_title, sector:x.department, company:x.company, admission:x.admission_date, phone:x.phone||'', email:x.email||'', status:employeeStatus[x.status]||x.status }));
   state.epis = epis.map(x=>{ const bs=batches.filter(b=>b.epi_id===x.id); return { id:x.id, batchId:bs[0]?.id||'', code:x.internal_code, name:x.description, category:x.category, ca:x.ca_number, caExpiry:x.ca_expiry, size:x.size||'', stock:bs.reduce((s,b)=>s+Number(b.current_quantity),0), minimum:Number(x.minimum_stock), unitCost:Number(x.unit_cost), location:x.storage_location||'', status:x.status==='active'?'Ativo':'Inativo' }; });
   state.epiDeliveries = movements.map(x=>({ id:x.id, epiId:x.epi_id, employeeId:x.employee_id, batchId:x.batch_id, epi:state.epis.find(e=>e.id===x.epi_id)?.name||'EPI', employee:state.employees.find(e=>e.id===x.employee_id)?.name||'Funcionário', quantity:Number(x.quantity), date:String(x.movement_at).slice(0,10), reason:x.reason||'', signed:Boolean(x.signed_at) }));
   state.courses = trainings.map(x=>{ const e=state.employees.find(v=>v.id===x.employee_id); const c=catalog.find(v=>v.id===x.training_id); return { id:x.id, employeeId:x.employee_id, trainingId:x.training_id, employee:e?.name||'Funcionário', employeeRegistration:e?.registration||'', course:c?.name||'Curso', institution:x.institution||c?.institution||'', completedAt:x.completed_at, expiresAt:x.expires_at, hours:Number(c?.workload_hours||0), certificate:x.certificate_path||'' }; });
-  state.expenses = expenses.map(x=>({ id:x.id, date:x.expense_date, description:x.description, category:categories.find(c=>c.id===x.category_id)?.name||'Outros', costCenter:centers.find(c=>c.id===x.cost_center_id)?.code||'', supplier:x.supplier||'', value:Number(x.amount), status:expenseStatus[x.status]||x.status, document:x.document_number||'', attachment:x.attachment_path||'' }));
   state.forklifts = forklifts.map(x=>{ const p=plans.find(v=>v.forklift_id===x.id && v.active) || {}; return { id:x.id, planId:p.id||'', code:x.code, asset:x.asset_number||'', manufacturer:x.manufacturer||'', model:x.model||'', capacity:x.capacity_tons?`${Number(x.capacity_tons).toLocaleString('pt-BR')} t`:'', year:x.manufacture_year||'', hourMeter:Number(x.hour_meter), location:x.location||'', status:forkliftStatus[x.status]||x.status, nextMaintenance:p.next_due_date||'', maintenanceHour:Number(p.next_due_hour||0) }; });
   state.maintenances = maintenance.map(x=>({ id:x.id, forkliftId:x.forklift_id, forklift:state.forklifts.find(f=>f.id===x.forklift_id)?.code||'', type:maintenanceType[x.maintenance_type]||x.maintenance_type, priority:priorityMap[x.priority]||x.priority, openedAt:String(x.opened_at).slice(0,10), description:x.failure_description, status:({open:'Aberta',in_progress:'Em andamento',waiting_parts:'Aguardando peça',completed:'Concluída'})[x.status]||x.status, cost:Number(x.labor_cost)+Number(x.parts_cost), attachment:x.attachment_path||'' }));
   state.checklists = checks.map(x=>({ id:x.id, forkliftId:x.forklift_id, forklift:state.forklifts.find(f=>f.id===x.forklift_id)?.code||'', date:x.inspection_date, shift:x.shift, failed:Array.isArray(x.items)?x.items.filter(i=>i.status==='Não conforme').length:(x.has_critical_failure?1:0), notes:x.notes||'' }));
   state.dds = dds.map(x=>({ id:x.id, date:x.session_date, time:String(x.session_time).slice(0,5), theme:x.custom_topic||'DDS', sector:x.department||'', leaderId:x.responsible_id, leader:state.employees.find(e=>e.id===x.responsible_id)?.name||'', participants:Number(x.participant_count||0), status:ddsStatus[x.status]||x.status, duration:Number(x.duration_minutes||0) }));
   state.audit = audit.map(x=>({ id:x.id, date:x.created_at, user:'Sistema', action:x.action }));
   if (settingsQ.error) throw settingsQ.error;
-  if (settingsQ.data) state.settings = { ...state.settings, company:settingsQ.data.company, unit:settingsQ.data.unit, monthlyBudget:Number(settingsQ.data.monthly_budget) };
+  if (settingsQ.data) state.settings = { ...state.settings, company:settingsQ.data.company, unit:settingsQ.data.unit };
   updateUserUI();
 }
 
-async function ensureCategory(name) {
-  let item=lookups.categories.find(x=>x.name===name); if(item) return item.id;
-  const q=await db.from('expense_categories').insert({name,status:'active'}).select().single(); if(q.error) throw q.error; lookups.categories.push(q.data); return q.data.id;
-}
-async function ensureCostCenter(code) {
-  let item=lookups.costCenters.find(x=>x.code===code); if(item) return item.id;
-  const q=await db.from('cost_centers').insert({code,name:code,monthly_budget:0,annual_budget:0,status:'active'}).select().single(); if(q.error) throw q.error; lookups.costCenters.push(q.data); return q.data.id;
-}
 async function ensureTraining(name,hours,institution) {
   let item=lookups.trainingCatalog.find(x=>x.name===name); if(item) return item.id;
   const q=await db.from('training_catalog').insert({name,training_type:'Interno',workload_hours:Number(hours||0),institution,status:'active'}).select().single(); if(q.error) throw q.error; lookups.trainingCatalog.push(q.data); return q.data.id;
@@ -149,10 +131,6 @@ async function syncState(action='') {
     const trainingId=await ensureTraining(x.course,x.hours,x.institution); x.employeeId=employee.id; x.trainingId=trainingId;
     const q=await db.from('employee_trainings').upsert({id:x.id,employee_id:employee.id,training_id:trainingId,completed_at:x.completedAt||null,expires_at:x.expiresAt||null,institution:x.institution||null,certificate_path:x.certificate||null,created_by:uid,updated_by:uid},{onConflict:'id'}); if(q.error) throw q.error;
   }
-  for (const x of state.expenses) {
-    const categoryId=await ensureCategory(x.category); const centerId=await ensureCostCenter(x.costCenter);
-    const q=await db.from('expenses').upsert({id:x.id,expense_date:x.date,competence:`${String(x.date).slice(0,7)}-01`,description:x.description,category_id:categoryId,cost_center_id:centerId,supplier:x.supplier||null,document_number:x.document||null,amount:Number(x.value||0),status:expenseStatusDb[x.status]||'requested',attachment_path:x.attachment||null,requested_by:uid,approved_by:['Aprovado','Pago'].includes(x.status)?uid:null,approved_at:['Aprovado','Pago'].includes(x.status)?new Date().toISOString():null},{onConflict:'id'}); if(q.error) throw q.error;
-  }
   for (const x of state.forklifts) {
     const cap=Number(String(x.capacity||'').replace(',','.').replace(/[^0-9.]/g,''))||null;
     const q=await db.from('forklifts').upsert({id:x.id,code:x.code,asset_number:x.asset||null,manufacturer:x.manufacturer||null,model:x.model||null,capacity_tons:cap,manufacture_year:Number(x.year)||null,hour_meter:Number(x.hourMeter||0),location:x.location||null,status:forkliftStatusDb[x.status]||'available'},{onConflict:'id'}); if(q.error) throw q.error;
@@ -167,7 +145,7 @@ async function syncState(action='') {
     const leader=state.employees.find(e=>e.name===x.leader)||state.employees.find(e=>e.id===x.leaderId);
     const q=await db.from('dds_sessions').upsert({id:x.id,session_date:x.date,session_time:x.time,custom_topic:x.theme,department:x.sector,unit:state.settings.unit,responsible_id:leader?.id||null,duration_minutes:Number(x.duration||0),participant_count:Number(x.participants||0),status:ddsStatusDb[x.status]||'scheduled',created_by:uid},{onConflict:'id'}); if(q.error) throw q.error;
   }
-  const settingsQ=await db.from('app_settings').upsert({id:1,company:state.settings.company,unit:state.settings.unit,monthly_budget:Number(state.settings.monthlyBudget||0),updated_by:uid},{onConflict:'id'}); if(settingsQ.error) throw settingsQ.error;
+  const settingsQ=await db.from('app_settings').upsert({id:1,company:state.settings.company,unit:state.settings.unit,updated_by:uid},{onConflict:'id'}); if(settingsQ.error) throw settingsQ.error;
   if(action){ const a=await db.from('audit_logs').insert({user_id:uid,action,entity_type:'application'}); if(a.error) console.warn(a.error); }
   localStorage.setItem('gst-theme',state.settings.theme||'light');
   await loadData();
@@ -238,7 +216,6 @@ function getNotifications() {
     if (days <= 30 || Number(forklift.hourMeter) >= Number(forklift.maintenanceHour)) notifications.push({ type: 'Empilhadeira', severity: days < 0 ? 'danger' : 'warning', title: 'Manutenção necessária', detail: `${forklift.code} — ${forklift.status}`, page: 'forklifts' });
     if (forklift.status === 'Interditada') notifications.push({ type: 'Empilhadeira', severity: 'danger', title: 'Equipamento interditado', detail: `${forklift.code} está bloqueada para operação`, page: 'forklifts' });
   });
-  state.expenses.filter(x => x.status === 'Aguardando aprovação').forEach(expense => notifications.push({ type: 'Gasto', severity: 'warning', title: 'Aprovação pendente', detail: `${expense.description} — ${currency(expense.value)}`, page: 'expenses' }));
   state.dds.filter(x => x.status === 'Programado').forEach(item => notifications.push({ type: 'DDS', severity: 'info', title: 'DDS programado', detail: `${dateBR(item.date)} — ${item.theme}`, page: 'dds' }));
   return notifications;
 }
@@ -265,7 +242,7 @@ function setPage(page) {
 }
 
 function renderPage() {
-  const renderers = { dashboard: renderDashboard, employees: renderEmployees, epis: renderEpis, courses: renderCourses, expenses: renderExpenses, forklifts: renderForklifts, dds: renderDDS, reports: renderReports, notifications: renderNotifications, settings: renderSettings };
+  const renderers = { dashboard: renderDashboard, employees: renderEmployees, epis: renderEpis, courses: renderCourses, forklifts: renderForklifts, dds: renderDDS, reports: renderReports, notifications: renderNotifications, settings: renderSettings };
   (renderers[currentPage] || renderDashboard)();
   updateNotificationCount();
 }
@@ -278,30 +255,13 @@ function renderDashboard() {
   const activeEmployees = state.employees.filter(x => x.status === 'Ativo').length;
   const lowStock = state.epis.filter(x => Number(x.stock) <= Number(x.minimum)).length;
   const expiredCourses = state.courses.filter(x => daysUntil(x.expiresAt) < 0).length;
-  const monthExpenses = state.expenses.filter(x => x.date.slice(0,7) === todayISO().slice(0,7)).reduce((sum,x) => sum + Number(x.value), 0);
   const availableForklifts = state.forklifts.filter(x => ['Operando','Disponível'].includes(x.status)).length;
   const ddsMonth = state.dds.filter(x => x.date.slice(0,7) === todayISO().slice(0,7) && x.status === 'Concluído').length;
   const notifications = getNotifications().slice(0, 6);
-  const monthFormatter = new Intl.DateTimeFormat('pt-BR', { month: 'short' });
-  const monthKeys = Array.from({ length: 6 }, (_, index) => {
-    const date = new Date();
-    date.setDate(1);
-    date.setMonth(date.getMonth() - (5 - index));
-    return {
-      key: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`,
-      label: monthFormatter.format(date).replace('.', '').replace(/^./, char => char.toUpperCase())
-    };
-  });
-  const monthlyData = monthKeys.map(month => state.expenses
-    .filter(expense => String(expense.date || '').slice(0, 7) === month.key)
-    .reduce((sum, expense) => sum + Number(expense.value || 0), 0));
-  const maxMonthlyExpense = Math.max(...monthlyData, 1);
   const userName = state.profile?.full_name || currentUser?.email?.split('@')[0] || 'Usuário';
   const firstName = userName.trim().split(/\s+/)[0];
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Bom dia' : hour < 18 ? 'Boa tarde' : 'Boa noite';
-  const budget = Number(state.settings.monthlyBudget || 0);
-  const budgetPercentage = budget > 0 ? Math.round(monthExpenses / budget * 100) : 0;
 
   $('#page-content').innerHTML = `
     <div class="toolbar"><div><h3 style="margin:0">${greeting}, ${escapeHtml(firstName)}</h3><p class="muted" style="margin:5px 0 0">Acompanhe os indicadores críticos da operação.</p></div><div class="toolbar-right"><button class="btn" data-action="export" data-export="dashboard">Exportar resumo</button><button class="btn primary" data-page="notifications">Ver alertas</button></div></div>
@@ -309,16 +269,12 @@ function renderDashboard() {
       ${metric('Funcionários ativos', activeEmployees, '◎', `${state.employees.length} cadastrados`)}
       ${metric('EPIs com estoque baixo', lowStock, '⬡', lowStock ? 'Ação necessária' : 'Estoque regular', !lowStock)}
       ${metric('Cursos vencidos', expiredCourses, '▤', expiredCourses ? 'Regularizar' : 'Conformidade total', !expiredCourses)}
-      ${metric('Gastos no mês', currency(monthExpenses), 'R$', budget > 0 ? `${budgetPercentage}% do orçamento` : 'Orçamento não definido', budget === 0 || monthExpenses <= budget)}
       ${metric('Empilhadeiras operacionais', `${availableForklifts}/${state.forklifts.length}`, '▰', `${state.forklifts.filter(x=>x.status==='Interditada').length} interditada(s)`, availableForklifts === state.forklifts.length)}
       ${metric('DDS realizados no mês', ddsMonth, '◉', `${state.dds.reduce((s,x)=>s+Number(x.participants),0)} participações`)}
       ${metric('Ordens de manutenção', state.maintenances.length, '⚒', `${state.maintenances.filter(x=>x.status!=='Concluída').length} abertas`, false)}
       ${metric('Alertas ativos', getNotifications().length, '♢', 'Central de notificações', getNotifications().length === 0)}
     </div>
-    <div class="dashboard-grid">
-      <section class="panel"><div class="panel-header"><div><p class="eyebrow">FINANCEIRO</p><h3>Evolução de gastos mensais</h3></div><strong>${currency(monthExpenses)}</strong></div><div class="bars">${monthlyData.map((value,i)=>`<div class="bar-wrap"><div class="bar" title="${currency(value)}" style="height:${value > 0 ? Math.max(8, value / maxMonthlyExpense * 100) : 2}%"></div><small>${monthKeys[i].label}</small></div>`).join('')}</div></section>
-      <section class="panel"><div class="panel-header"><div><p class="eyebrow">ATENÇÃO</p><h3>Alertas prioritários</h3></div><button class="btn small" data-page="notifications">Todos</button></div><div class="alert-list">${notifications.length ? notifications.map(n=>`<button class="alert-item" data-page="${n.page}" style="border:0;text-align:left;color:inherit"><span class="alert-dot">${n.severity === 'danger' ? '!' : '•'}</span><span><strong>${escapeHtml(n.title)}</strong><small>${escapeHtml(n.detail)}</small></span>${badge(n.type, n.severity)}</button>`).join('') : '<div class="empty">Nenhum alerta ativo.</div>'}</div></section>
-    </div>`;
+    <section class="panel"><div class="panel-header"><div><p class="eyebrow">ATENÇÃO</p><h3>Alertas prioritários</h3></div><button class="btn small" data-page="notifications">Todos</button></div><div class="alert-list">${notifications.length ? notifications.map(n=>`<button class="alert-item" data-page="${n.page}" style="border:0;text-align:left;color:inherit"><span class="alert-dot">${n.severity === 'danger' ? '!' : '•'}</span><span><strong>${escapeHtml(n.title)}</strong><small>${escapeHtml(n.detail)}</small></span>${badge(n.type, n.severity)}</button>`).join('') : '<div class="empty">Nenhum alerta ativo.</div>'}</div></section>`;
 }
 
 function toolbar(title, subtitle, actionLabel, actionType, filters = '') {
@@ -347,16 +303,6 @@ function renderCourses() {
   <div class="table-card"><div class="table-wrap"><table><thead><tr><th>Funcionário</th><th>Curso</th><th>Instituição</th><th>Realização</th><th>Validade</th><th>Carga horária</th><th>Status</th><th>Ações</th></tr></thead><tbody>${rows.map(x=>{const st=courseStatus(x); return `<tr><td><strong>${escapeHtml(x.employee)}</strong><br><span class="muted">${escapeHtml(x.employeeRegistration)}</span></td><td><strong>${escapeHtml(x.course)}</strong><br><span class="muted">${escapeHtml(x.certificate || 'Sem anexo')}</span></td><td>${escapeHtml(x.institution)}</td><td>${dateBR(x.completedAt)}</td><td>${dateBR(x.expiresAt)}</td><td>${x.hours}h</td><td>${badge(st[0],st[1])}</td><td><div class="actions"><button class="btn small" data-action="open-form" data-form="course" data-id="${x.id}">Editar</button><button class="btn small danger" data-action="delete" data-collection="courses" data-id="${x.id}">Excluir</button></div></td></tr>`}).join('') || `<tr><td colspan="8"><div class="empty">Nenhum curso encontrado.</div></td></tr>`}</tbody></table></div></div>`;
 }
 
-function renderExpenses() {
-  const rows = state.expenses.filter(x => [x.description,x.category,x.costCenter,x.supplier,x.status,x.document].join(' ').toLowerCase().includes(tableSearch.toLowerCase()) && (tableFilter === 'Todos' || x.status === tableFilter));
-  const total = state.expenses.reduce((s,x)=>s+Number(x.value),0);
-  const approved = state.expenses.filter(x=>['Aprovado','Pago'].includes(x.status)).reduce((s,x)=>s+Number(x.value),0);
-  const pending = state.expenses.filter(x=>x.status==='Aguardando aprovação').reduce((s,x)=>s+Number(x.value),0);
-  $('#page-content').innerHTML = `${toolbar('Controle de gastos', 'Orçamento, solicitações, aprovações e documentos fiscais.', 'Novo gasto', 'expense', `<select id="table-filter" class="select"><option>Todos</option>${['Previsto','Solicitado','Aguardando aprovação','Aprovado','Pago','Cancelado'].map(x=>`<option ${tableFilter===x?'selected':''}>${x}</option>`).join('')}</select>`)}
-  <div class="metrics" style="margin-bottom:16px">${metric('Total registrado', currency(total), 'R$', `${state.expenses.length} lançamentos`)}${metric('Aprovado / pago', currency(approved), '✓', `${Math.round(approved/total*100)||0}% do total`)}${metric('Aguardando aprovação', currency(pending), '⌛', 'Ação do gestor', false)}${metric('Orçamento mensal', currency(state.settings.monthlyBudget), '▥', `${Math.round(total/state.settings.monthlyBudget*100)}% utilizado`, total<=state.settings.monthlyBudget)}</div>
-  <div class="table-card"><div class="table-wrap"><table><thead><tr><th>Data</th><th>Descrição</th><th>Categoria</th><th>Centro de custo</th><th>Fornecedor</th><th>Documento</th><th>Valor</th><th>Status</th><th>Ações</th></tr></thead><tbody>${rows.map(x=>`<tr><td>${dateBR(x.date)}</td><td><strong>${escapeHtml(x.description)}</strong></td><td>${escapeHtml(x.category)}</td><td>${escapeHtml(x.costCenter)}</td><td>${escapeHtml(x.supplier)}</td><td>${escapeHtml(x.document)}</td><td><strong>${currency(x.value)}</strong></td><td>${badge(x.status)}</td><td><div class="actions">${x.status==='Aguardando aprovação'?`<button class="btn small primary" data-action="approve-expense" data-id="${x.id}">Aprovar</button>`:''}<button class="btn small" data-action="open-form" data-form="expense" data-id="${x.id}">Editar</button></div></td></tr>`).join('') || `<tr><td colspan="9"><div class="empty">Nenhum gasto encontrado.</div></td></tr>`}</tbody></table></div></div>`;
-}
-
 function renderForklifts() {
   const items = state.forklifts.filter(x => [x.code,x.asset,x.manufacturer,x.model,x.location,x.status].join(' ').toLowerCase().includes(tableSearch.toLowerCase()) && (tableFilter === 'Todos' || x.status === tableFilter));
   $('#page-content').innerHTML = `${toolbar('Empilhadeiras', 'Disponibilidade, checklists, manutenção e custos por equipamento.', 'Nova empilhadeira', 'forklift', `<select id="table-filter" class="select"><option>Todos</option>${['Operando','Disponível','Manutenção programada','Manutenção corretiva','Interditada','Baixada'].map(x=>`<option ${tableFilter===x?'selected':''}>${x}</option>`).join('')}</select>`)}
@@ -379,14 +325,13 @@ function renderNotifications() {
 function renderReports() {
   const epiValue = state.epis.reduce((s,x)=>s+Number(x.stock)*Number(x.unitCost),0);
   const maintenanceCost = state.maintenances.reduce((s,x)=>s+Number(x.cost),0);
-  const expenseByCategory = Object.entries(state.expenses.reduce((acc,x)=>{acc[x.category]=(acc[x.category]||0)+Number(x.value);return acc;},{})).sort((a,b)=>b[1]-a[1]);
   $('#page-content').innerHTML = `<div class="toolbar"><div><h3 style="margin:0">Relatórios gerenciais</h3><p class="muted" style="margin:5px 0 0">Indicadores consolidados e exportação dos dados.</p></div><div class="toolbar-right"><button class="btn primary" data-action="export" data-export="all">Exportar base completa</button></div></div>
   <div class="metrics">${metric('Patrimônio em EPI', currency(epiValue), '⬡', `${state.epis.reduce((s,x)=>s+Number(x.stock),0)} unidades`)}${metric('Custo de manutenção', currency(maintenanceCost), '⚒', `${state.maintenances.length} ordens`)}${metric('Conformidade de cursos', `${Math.round(state.courses.filter(x=>daysUntil(x.expiresAt)>=0).length/Math.max(1,state.courses.length)*100)}%`, '▤', 'Base cadastrada')}${metric('Disponibilidade de frota', `${Math.round(state.forklifts.filter(x=>['Operando','Disponível'].includes(x.status)).length/Math.max(1,state.forklifts.length)*100)}%`, '▰', 'Situação atual')}</div>
-  <div class="dashboard-grid"><section class="panel"><div class="panel-header"><h3>Gastos por categoria</h3></div><div class="alert-list">${expenseByCategory.map(([category,value])=>`<div class="alert-item"><span class="alert-dot">R$</span><span><strong>${escapeHtml(category)}</strong><small>${Math.round(value/state.expenses.reduce((s,x)=>s+Number(x.value),0)*100)}% dos gastos</small></span><strong>${currency(value)}</strong></div>`).join('')}</div></section><section class="panel"><div class="panel-header"><h3>Últimas alterações</h3></div><div class="alert-list">${state.audit.slice(0,8).map(x=>`<div class="alert-item"><span class="alert-dot">↺</span><span><strong>${escapeHtml(x.action)}</strong><small>${new Date(x.date).toLocaleString('pt-BR')} • ${escapeHtml(x.user)}</small></span></div>`).join('')}</div></section></div>`;
+  <section class="panel"><div class="panel-header"><h3>Últimas alterações</h3></div><div class="alert-list">${state.audit.slice(0,8).map(x=>`<div class="alert-item"><span class="alert-dot">↺</span><span><strong>${escapeHtml(x.action)}</strong><small>${new Date(x.date).toLocaleString('pt-BR')} • ${escapeHtml(x.user)}</small></span></div>`).join('') || '<div class="empty">Nenhuma alteração registrada.</div>'}</div></section>`;
 }
 
 function renderSettings() {
-  $('#page-content').innerHTML = `<div class="toolbar"><div><h3 style="margin:0">Configurações</h3><p class="muted" style="margin:5px 0 0">Dados da unidade, orçamento e armazenamento.</p></div></div><section class="panel"><form id="settings-form" class="form-grid" style="padding:0"><label>Empresa<input name="company" value="${escapeHtml(state.settings.company)}" /></label><label>Unidade / base<input name="unit" value="${escapeHtml(state.settings.unit)}" /></label><label>Orçamento mensal (R$)<input type="number" min="0" step="0.01" name="monthlyBudget" value="${state.settings.monthlyBudget}" /></label><label>Tema<select name="theme"><option value="light" ${state.settings.theme==='light'?'selected':''}>Claro</option><option value="dark" ${state.settings.theme==='dark'?'selected':''}>Escuro</option></select></label><div class="form-actions"><button type="button" class="btn" data-action="refresh-data">Atualizar dados</button><button type="submit" class="btn primary">Salvar configurações</button></div></form></section><section class="panel" style="margin-top:16px"><div class="panel-header"><div><p class="eyebrow">ARQUITETURA</p><h3>Status da integração</h3></div>${badge('Supabase conectado','success')}</div><p class="muted">Banco, autenticação, auditoria e armazenamento de documentos estão conectados ao Supabase. Todas as alterações são persistidas na nuvem.</p></section>`;
+  $('#page-content').innerHTML = `<div class="toolbar"><div><h3 style="margin:0">Configurações</h3><p class="muted" style="margin:5px 0 0">Dados da unidade e preferências do aplicativo.</p></div></div><section class="panel"><form id="settings-form" class="form-grid" style="padding:0"><label>Empresa<input name="company" value="${escapeHtml(state.settings.company)}" /></label><label>Unidade / base<input name="unit" value="${escapeHtml(state.settings.unit)}" /></label><label>Tema<select name="theme"><option value="light" ${state.settings.theme==='light'?'selected':''}>Claro</option><option value="dark" ${state.settings.theme==='dark'?'selected':''}>Escuro</option></select></label><div class="form-actions"><button type="button" class="btn" data-action="refresh-data">Atualizar dados</button><button type="submit" class="btn primary">Salvar configurações</button></div></form></section><section class="panel" style="margin-top:16px"><div class="panel-header"><div><p class="eyebrow">ARQUITETURA</p><h3>Status da integração</h3></div>${badge('Supabase conectado','success')}</div><p class="muted">Banco, autenticação, auditoria e armazenamento de documentos estão conectados ao Supabase. Todas as alterações são persistidas na nuvem.</p></section>`;
 }
 
 const formSchemas = {
@@ -403,11 +348,6 @@ const formSchemas = {
   course: {
     title: 'Curso / certificado', collection: 'courses', fields: [
       ['employee','Funcionário','select',true,()=>state.employees.map(x=>x.name)], ['employeeRegistration','Matrícula','text',true], ['course','Curso / treinamento','text',true], ['institution','Instituição','text',true], ['completedAt','Data de realização','date',true], ['expiresAt','Validade','date',true], ['hours','Carga horária','number',true], ['certificate','Arquivo atual','text',false], ['certificateFile','Enviar certificado','file',false]
-    ]
-  },
-  expense: {
-    title: 'Lançamento de gasto', collection: 'expenses', fields: [
-      ['date','Data','date',true], ['description','Descrição','text',true], ['category','Categoria','select',true,['EPI','Manutenção','Treinamentos','Combustível','Serviços','Outros']], ['costCenter','Centro de custo','text',true], ['supplier','Fornecedor','text',true], ['document','Nota / documento','text',false], ['value','Valor (R$)','number',true], ['attachmentFile','Anexar comprovante','file',false], ['status','Status','select',true,['Previsto','Solicitado','Aguardando aprovação','Aprovado','Pago','Cancelado']]
     ]
   },
   forklift: {
@@ -468,9 +408,8 @@ async function handleFormSubmit(event) {
   event.preventDefault();
   const form=event.target; const data=Object.fromEntries(new FormData(form)); const type=form.dataset.type; const id=form.dataset.id; const schema=formSchemas[type];
   try {
-    const numeric=['stock','minimum','unitCost','hours','value','year','hourMeter','maintenanceHour','participants','duration']; numeric.forEach(k=>{if(k in data)data[k]=Number(data[k]);});
+    const numeric=['stock','minimum','unitCost','hours','year','hourMeter','maintenanceHour','participants','duration']; numeric.forEach(k=>{if(k in data)data[k]=Number(data[k]);});
     if(type==='course') { const employee=state.employees.find(x=>x.name===data.employee); if(employee)data.employeeRegistration=employee.registration; const path=await uploadFromForm(form,'certificateFile','certificates'); if(path)data.certificate=path; delete data.certificateFile; }
-    if(type==='expense') { const path=await uploadFromForm(form,'attachmentFile','expenses'); if(path)data.attachment=path; delete data.attachmentFile; }
     if(schema){ if(id){ const idx=state[schema.collection].findIndex(x=>x.id===id); state[schema.collection][idx]={...state[schema.collection][idx],...data}; } else state[schema.collection].unshift({id:crypto.randomUUID(),...data}); await syncState(`${schema.title} salvo: ${data.name||data.description||data.course||data.code||data.theme}`); toast('Registro salvo com sucesso.'); }
     else if(type==='delivery'){
       const epi=state.epis.find(x=>x.id===id); const employee=state.employees.find(x=>x.name===data.employee); const qty=Number(data.quantity); if(!employee) throw new Error('Funcionário não encontrado');
@@ -494,7 +433,6 @@ async function deleteRecord(collection,id){
     if(collection==='employees') q=await db.from('employees').update({archived_at:new Date().toISOString(),status:'terminated'}).eq('id',id);
     else if(collection==='epis') q=await db.from('epi_catalog').update({status:'archived'}).eq('id',id);
     else if(collection==='courses') q=await db.from('employee_trainings').delete().eq('id',id);
-    else if(collection==='expenses') q=await db.from('expenses').update({archived_at:new Date().toISOString()}).eq('id',id);
     else if(collection==='forklifts') q=await db.from('forklifts').update({archived_at:new Date().toISOString(),status:'retired'}).eq('id',id);
     else if(collection==='dds') q=await db.from('dds_sessions').delete().eq('id',id);
     if(q?.error) throw q.error; await db.from('audit_logs').insert({user_id:currentUser.id,action:`Registro arquivado em ${collection}`,entity_type:collection,entity_id:id}); await loadData(); renderPage(); toast('Registro arquivado.');
@@ -512,8 +450,8 @@ function downloadCSV(filename, rows) {
 }
 
 function exportData(type) {
-  const map = { employees: state.employees, epis: state.epis, courses: state.courses, expenses: state.expenses, forklifts: state.forklifts, dds: state.dds, notifications: getNotifications() };
-  if (type === 'dashboard') return downloadCSV('resumo-dashboard.csv', [{ indicador: 'Funcionários ativos', valor: state.employees.filter(x=>x.status==='Ativo').length }, { indicador: 'Alertas ativos', valor: getNotifications().length }, { indicador: 'Gastos totais', valor: state.expenses.reduce((s,x)=>s+Number(x.value),0) }]);
+  const map = { employees: state.employees, epis: state.epis, courses: state.courses, forklifts: state.forklifts, dds: state.dds, notifications: getNotifications() };
+  if (type === 'dashboard') return downloadCSV('resumo-dashboard.csv', [{ indicador: 'Funcionários ativos', valor: state.employees.filter(x=>x.status==='Ativo').length }, { indicador: 'Alertas ativos', valor: getNotifications().length }]);
   if (type === 'all') return downloadCSV('gestao-segura-base-completa.csv', Object.entries(map).flatMap(([module,rows])=>rows.map(row=>({ modulo: module, ...row }))));
   downloadCSV(`${type}.csv`, map[type] || []);
 }
@@ -526,7 +464,6 @@ function bindEvents() {
     if(action==='close-modal')closeModal();
     if(action==='delete')await deleteRecord(actionEl.dataset.collection,actionEl.dataset.id);
     if(action==='export')exportData(actionEl.dataset.export);
-    if(action==='approve-expense')try{const item=state.expenses.find(x=>x.id===actionEl.dataset.id);item.status='Aprovado';await syncState(`Gasto aprovado: ${item.description}`);toast('Gasto aprovado.');renderPage();}catch(e){toast(e.message);}
     if(action==='complete-dds')try{const item=state.dds.find(x=>x.id===actionEl.dataset.id);const count=Number(prompt('Quantidade de participantes:','10'));if(!Number.isFinite(count))return;item.participants=count;item.status='Concluído';await syncState(`DDS concluído: ${item.theme}`);toast('DDS concluído.');renderPage();}catch(e){toast(e.message);}
     if(action==='refresh-data'){try{await loadData();renderPage();toast('Dados atualizados.');}catch(e){toast(e.message);}}
   });
@@ -536,7 +473,7 @@ function bindEvents() {
   $('#menu-btn').addEventListener('click',()=>$('#sidebar').classList.toggle('open')); $('#notification-btn').addEventListener('click',()=>setPage('notifications'));
   $('#theme-btn').addEventListener('click',()=>{state.settings.theme=state.settings.theme==='dark'?'light':'dark';localStorage.setItem('gst-theme',state.settings.theme);applyTheme();});
   $('#logout-btn').addEventListener('click',logout); $('#global-search').addEventListener('keydown',e=>{if(e.key==='Enter'){tableSearch=e.target.value;setPage('employees');}});
-  document.addEventListener('submit',async event=>{if(event.target.id==='settings-form'){event.preventDefault();try{const data=Object.fromEntries(new FormData(event.target));state.settings={...state.settings,...data,monthlyBudget:Number(data.monthlyBudget)};await syncState('Configurações atualizadas');applyTheme();toast('Configurações salvas.');renderPage();}catch(e){toast(e.message);}}});
+  document.addEventListener('submit',async event=>{if(event.target.id==='settings-form'){event.preventDefault();try{const data=Object.fromEntries(new FormData(event.target));state.settings={...state.settings,...data};await syncState('Configurações atualizadas');applyTheme();toast('Configurações salvas.');renderPage();}catch(e){toast(e.message);}}});
 }
 
 function applyTheme(){document.documentElement.dataset.theme=state.settings.theme||'light';}
