@@ -179,15 +179,6 @@ function daysUntil(date) {
   return Math.ceil((end - now) / 86400000);
 }
 
-function courseStatus(course) {
-  const days = daysUntil(course.expiresAt);
-  if (days < 0) return ['Vencido', 'danger'];
-  if (days <= 30) return [`Vence em ${days} dias`, 'danger'];
-  if (days <= 60) return [`Vence em ${days} dias`, 'warning'];
-  if (days <= 90) return [`Vence em ${days} dias`, 'info'];
-  return ['Válido', 'success'];
-}
-
 function statusClass(status = '') {
   const s = status.toLowerCase();
   if (s.includes('venc') || s.includes('interdit') || s.includes('crítica') || s.includes('cancel') || s.includes('baixo')) return 'danger';
@@ -204,12 +195,6 @@ function getNotifications() {
   const notifications = [];
   state.epis.forEach(epi => {
     if (Number(epi.stock) <= Number(epi.minimum)) notifications.push({ type: 'EPI', severity: 'danger', title: 'Estoque mínimo atingido', detail: `${epi.name}: ${epi.stock} em estoque`, page: 'epis' });
-    const days = daysUntil(epi.caExpiry);
-    if (days <= 90) notifications.push({ type: 'EPI', severity: days < 0 ? 'danger' : 'warning', title: days < 0 ? 'CA vencido' : 'CA próximo do vencimento', detail: `${epi.name} — ${days < 0 ? Math.abs(days) + ' dias vencido' : days + ' dias'}`, page: 'epis' });
-  });
-  state.courses.forEach(course => {
-    const days = daysUntil(course.expiresAt);
-    if (days <= 90) notifications.push({ type: 'Curso', severity: days < 0 ? 'danger' : 'warning', title: days < 0 ? 'Curso vencido' : 'Curso próximo do vencimento', detail: `${course.employee} — ${course.course}`, page: 'courses' });
   });
   state.forklifts.forEach(forklift => {
     const days = daysUntil(forklift.nextMaintenance);
@@ -254,7 +239,6 @@ function metric(label, value, icon, delta, good = true) {
 function renderDashboard() {
   const activeEmployees = state.employees.filter(x => x.status === 'Ativo').length;
   const lowStock = state.epis.filter(x => Number(x.stock) <= Number(x.minimum)).length;
-  const expiredCourses = state.courses.filter(x => daysUntil(x.expiresAt) < 0).length;
   const availableForklifts = state.forklifts.filter(x => ['Operando','Disponível'].includes(x.status)).length;
   const ddsMonth = state.dds.filter(x => x.date.slice(0,7) === todayISO().slice(0,7) && x.status === 'Concluído').length;
   const notifications = getNotifications().slice(0, 6);
@@ -268,7 +252,7 @@ function renderDashboard() {
     <div class="metrics">
       ${metric('Funcionários ativos', activeEmployees, '◎', `${state.employees.length} cadastrados`)}
       ${metric('EPIs com estoque baixo', lowStock, '⬡', lowStock ? 'Ação necessária' : 'Estoque regular', !lowStock)}
-      ${metric('Cursos vencidos', expiredCourses, '▤', expiredCourses ? 'Regularizar' : 'Conformidade total', !expiredCourses)}
+      ${metric('Cursos cadastrados', state.courses.length, '▤', `${state.courses.filter(x=>x.certificate).length} certificados`)}
       ${metric('Empilhadeiras operacionais', `${availableForklifts}/${state.forklifts.length}`, '▰', `${state.forklifts.filter(x=>x.status==='Interditada').length} interditada(s)`, availableForklifts === state.forklifts.length)}
       ${metric('DDS realizados no mês', ddsMonth, '◉', `${state.dds.reduce((s,x)=>s+Number(x.participants),0)} participações`)}
       ${metric('Ordens de manutenção', state.maintenances.length, '⚒', `${state.maintenances.filter(x=>x.status!=='Concluída').length} abertas`, false)}
@@ -291,23 +275,23 @@ function renderEpis() {
   const rows = state.epis.filter(x => [x.code,x.name,x.category,x.ca,x.size,x.location,x.status].join(' ').toLowerCase().includes(tableSearch.toLowerCase()) && (tableFilter === 'Todos' || x.category === tableFilter));
   const categories = [...new Set(state.epis.map(x=>x.category))];
   $('#page-content').innerHTML = `${toolbar('Controle de EPI', 'Estoque por item, CA, tamanho, entregas e movimentações.', 'Novo EPI', 'epi', `<select id="table-filter" class="select"><option>Todos</option>${categories.map(x=>`<option ${tableFilter===x?'selected':''}>${x}</option>`).join('')}</select>`)}
-  <div class="metrics" style="margin-bottom:16px">${metric('Valor em estoque', currency(state.epis.reduce((s,x)=>s+Number(x.stock)*Number(x.unitCost),0)), 'R$', `${state.epis.length} itens`)}${metric('Estoque baixo', state.epis.filter(x=>Number(x.stock)<=Number(x.minimum)).length, '!', 'Reposição necessária', false)}${metric('Entregas registradas', state.epiDeliveries.length, '↗', 'Histórico rastreável')}${metric('CAs em até 90 dias', state.epis.filter(x=>daysUntil(x.caExpiry)<=90).length, '⌛', 'Verificar validade', false)}</div>
-  <div class="table-card"><div class="table-wrap"><table><thead><tr><th>EPI</th><th>Categoria / CA</th><th>Tamanho</th><th>Estoque</th><th>Custo unitário</th><th>Validade CA</th><th>Status</th><th>Ações</th></tr></thead><tbody>${rows.map(x=>`<tr><td><div class="entity"><span class="entity-avatar">⬡</span><span><strong>${escapeHtml(x.name)}</strong><small>${escapeHtml(x.code)} • ${escapeHtml(x.location)}</small></span></div></td><td>${escapeHtml(x.category)}<br><span class="muted">CA ${escapeHtml(x.ca)}</span></td><td>${escapeHtml(x.size)}</td><td><strong>${number(x.stock)}</strong> / mín. ${number(x.minimum)}</td><td>${currency(x.unitCost)}</td><td>${dateBR(x.caExpiry)}</td><td>${badge(Number(x.stock)<=Number(x.minimum)?'Estoque baixo':x.status)}</td><td><div class="actions"><button class="btn small primary" data-action="open-form" data-form="delivery" data-id="${x.id}">Entregar</button><button class="btn small" data-action="open-form" data-form="epi" data-id="${x.id}">Editar</button></div></td></tr>`).join('') || `<tr><td colspan="8"><div class="empty">Nenhum EPI encontrado.</div></td></tr>`}</tbody></table></div></div>
+  <div class="metrics" style="margin-bottom:16px">${metric('Itens cadastrados', state.epis.length, '⬡', `${state.epis.reduce((s,x)=>s+Number(x.stock),0)} unidades`)}${metric('Estoque baixo', state.epis.filter(x=>Number(x.stock)<=Number(x.minimum)).length, '!', 'Reposição necessária', false)}${metric('Entregas registradas', state.epiDeliveries.length, '↗', 'Histórico rastreável')}</div>
+  <div class="table-card"><div class="table-wrap"><table><thead><tr><th>EPI</th><th>Categoria / CA</th><th>Tamanho</th><th>Estoque</th><th>Status</th><th>Ações</th></tr></thead><tbody>${rows.map(x=>`<tr><td><div class="entity"><span class="entity-avatar">⬡</span><span><strong>${escapeHtml(x.name)}</strong><small>${escapeHtml(x.code)} • ${escapeHtml(x.location)}</small></span></div></td><td>${escapeHtml(x.category)}<br><span class="muted">CA ${escapeHtml(x.ca)}</span></td><td>${escapeHtml(x.size)}</td><td><strong>${number(x.stock)}</strong> / mín. ${number(x.minimum)}</td><td>${badge(Number(x.stock)<=Number(x.minimum)?'Estoque baixo':x.status)}</td><td><div class="actions"><button class="btn small primary" data-action="open-form" data-form="delivery" data-id="${x.id}">Entregar</button><button class="btn small" data-action="open-form" data-form="epi" data-id="${x.id}">Editar</button></div></td></tr>`).join('') || `<tr><td colspan="6"><div class="empty">Nenhum EPI encontrado.</div></td></tr>`}</tbody></table></div></div>
   ${state.epiDeliveries.length ? `<section class="panel" style="margin-top:16px"><div class="panel-header"><h3>Últimas entregas</h3></div><div class="table-wrap"><table><thead><tr><th>Data</th><th>Funcionário</th><th>EPI</th><th>Qtd.</th><th>Motivo</th><th>Assinatura</th></tr></thead><tbody>${state.epiDeliveries.slice(0,8).map(x=>`<tr><td>${dateBR(x.date)}</td><td>${escapeHtml(x.employee)}</td><td>${escapeHtml(x.epi)}</td><td>${x.quantity}</td><td>${escapeHtml(x.reason)}</td><td>${badge(x.signed?'Assinado':'Pendente')}</td></tr>`).join('')}</tbody></table></div></section>`:''}`;
 }
 
 function renderCourses() {
-  const rows = state.courses.filter(x => [x.employee,x.employeeRegistration,x.course,x.institution].join(' ').toLowerCase().includes(tableSearch.toLowerCase()) && (tableFilter === 'Todos' || courseStatus(x)[0].startsWith(tableFilter)));
-  $('#page-content').innerHTML = `${toolbar('Cursos e documentos', 'Matriz de treinamentos, certificados e vencimentos.', 'Registrar curso', 'course', `<select id="table-filter" class="select"><option>Todos</option>${['Válido','Vence','Vencido'].map(x=>`<option ${tableFilter===x?'selected':''}>${x}</option>`).join('')}</select>`)}
-  <div class="metrics" style="margin-bottom:16px">${metric('Registros válidos', state.courses.filter(x=>daysUntil(x.expiresAt)>90).length, '✓', 'Conformidade')}${metric('Vencem em até 90 dias', state.courses.filter(x=>{const d=daysUntil(x.expiresAt);return d>=0&&d<=90}).length, '⌛', 'Programar reciclagem', false)}${metric('Cursos vencidos', state.courses.filter(x=>daysUntil(x.expiresAt)<0).length, '!', 'Bloqueio operacional', false)}${metric('Certificados anexados', state.courses.filter(x=>x.certificate).length, '▤', 'Documentação digital')}</div>
-  <div class="table-card"><div class="table-wrap"><table><thead><tr><th>Funcionário</th><th>Curso</th><th>Instituição</th><th>Realização</th><th>Validade</th><th>Carga horária</th><th>Status</th><th>Ações</th></tr></thead><tbody>${rows.map(x=>{const st=courseStatus(x); return `<tr><td><strong>${escapeHtml(x.employee)}</strong><br><span class="muted">${escapeHtml(x.employeeRegistration)}</span></td><td><strong>${escapeHtml(x.course)}</strong><br><span class="muted">${escapeHtml(x.certificate || 'Sem anexo')}</span></td><td>${escapeHtml(x.institution)}</td><td>${dateBR(x.completedAt)}</td><td>${dateBR(x.expiresAt)}</td><td>${x.hours}h</td><td>${badge(st[0],st[1])}</td><td><div class="actions"><button class="btn small" data-action="open-form" data-form="course" data-id="${x.id}">Editar</button><button class="btn small danger" data-action="delete" data-collection="courses" data-id="${x.id}">Excluir</button></div></td></tr>`}).join('') || `<tr><td colspan="8"><div class="empty">Nenhum curso encontrado.</div></td></tr>`}</tbody></table></div></div>`;
+  const rows = state.courses.filter(x => [x.employee,x.employeeRegistration,x.course,x.institution].join(' ').toLowerCase().includes(tableSearch.toLowerCase()));
+  $('#page-content').innerHTML = `${toolbar('Cursos e documentos', 'Matriz de treinamentos e certificados.', 'Registrar curso', 'course')}
+  <div class="metrics" style="margin-bottom:16px">${metric('Cursos registrados', state.courses.length, '✓', 'Histórico de treinamentos')}${metric('Certificados anexados', state.courses.filter(x=>x.certificate).length, '▤', 'Documentação digital')}</div>
+  <div class="table-card"><div class="table-wrap"><table><thead><tr><th>Funcionário</th><th>Curso</th><th>Instituição</th><th>Realização</th><th>Carga horária</th><th>Ações</th></tr></thead><tbody>${rows.map(x=>`<tr><td><strong>${escapeHtml(x.employee)}</strong><br><span class="muted">${escapeHtml(x.employeeRegistration)}</span></td><td><strong>${escapeHtml(x.course)}</strong><br><span class="muted">${escapeHtml(x.certificate || 'Sem anexo')}</span></td><td>${escapeHtml(x.institution)}</td><td>${dateBR(x.completedAt)}</td><td>${x.hours}h</td><td><div class="actions"><button class="btn small" data-action="open-form" data-form="course" data-id="${x.id}">Editar</button><button class="btn small danger" data-action="delete" data-collection="courses" data-id="${x.id}">Excluir</button></div></td></tr>`).join('') || `<tr><td colspan="6"><div class="empty">Nenhum curso encontrado.</div></td></tr>`}</tbody></table></div></div>`;
 }
 
 function renderForklifts() {
   const items = state.forklifts.filter(x => [x.code,x.asset,x.manufacturer,x.model,x.location,x.status].join(' ').toLowerCase().includes(tableSearch.toLowerCase()) && (tableFilter === 'Todos' || x.status === tableFilter));
-  $('#page-content').innerHTML = `${toolbar('Empilhadeiras', 'Disponibilidade, checklists, manutenção e custos por equipamento.', 'Nova empilhadeira', 'forklift', `<select id="table-filter" class="select"><option>Todos</option>${['Operando','Disponível','Manutenção programada','Manutenção corretiva','Interditada','Baixada'].map(x=>`<option ${tableFilter===x?'selected':''}>${x}</option>`).join('')}</select>`)}
+  $('#page-content').innerHTML = `${toolbar('Empilhadeiras', 'Disponibilidade, checklists e manutenção por equipamento.', 'Nova empilhadeira', 'forklift', `<select id="table-filter" class="select"><option>Todos</option>${['Operando','Disponível','Manutenção programada','Manutenção corretiva','Interditada','Baixada'].map(x=>`<option ${tableFilter===x?'selected':''}>${x}</option>`).join('')}</select>`)}
   <div class="cards-grid">${items.map(x=>{const progress=Math.min(100,Math.round(Number(x.hourMeter)/Number(x.maintenanceHour)*100));return `<article class="asset-card"><div class="asset-head"><div><p class="eyebrow">${escapeHtml(x.asset)}</p><h3>${escapeHtml(x.code)} • ${escapeHtml(x.manufacturer)}</h3><span class="muted">${escapeHtml(x.model)} — ${escapeHtml(x.capacity)}</span></div>${badge(x.status)}</div><div class="specs"><div class="spec"><small>Horímetro</small><strong>${number(x.hourMeter)} h</strong></div><div class="spec"><small>Localização</small><strong>${escapeHtml(x.location)}</strong></div><div class="spec"><small>Próxima preventiva</small><strong>${dateBR(x.nextMaintenance)}</strong></div><div class="spec"><small>Meta de horas</small><strong>${number(x.maintenanceHour)} h</strong></div></div><div class="progress" title="${progress}% da meta"><span style="width:${progress}%"></span></div><div class="actions" style="margin-top:16px"><button class="btn small primary" data-action="open-form" data-form="checklist" data-id="${x.id}">Checklist</button><button class="btn small" data-action="open-form" data-form="maintenance" data-id="${x.id}">Abrir OS</button><button class="btn small" data-action="open-form" data-form="forklift" data-id="${x.id}">Editar</button></div></article>`}).join('') || `<div class="empty">Nenhuma empilhadeira encontrada.</div>`}</div>
-  <section class="panel" style="margin-top:16px"><div class="panel-header"><div><p class="eyebrow">MANUTENÇÃO</p><h3>Ordens de serviço</h3></div></div><div class="table-wrap"><table><thead><tr><th>Equipamento</th><th>Tipo</th><th>Prioridade</th><th>Abertura</th><th>Descrição</th><th>Custo</th><th>Status</th></tr></thead><tbody>${state.maintenances.map(x=>`<tr><td><strong>${escapeHtml(x.forklift)}</strong></td><td>${escapeHtml(x.type)}</td><td>${badge(x.priority)}</td><td>${dateBR(x.openedAt)}</td><td>${escapeHtml(x.description)}</td><td>${currency(x.cost)}</td><td>${badge(x.status)}</td></tr>`).join('') || `<tr><td colspan="7"><div class="empty">Nenhuma ordem aberta.</div></td></tr>`}</tbody></table></div></section>`;
+  <section class="panel" style="margin-top:16px"><div class="panel-header"><div><p class="eyebrow">MANUTENÇÃO</p><h3>Ordens de serviço</h3></div></div><div class="table-wrap"><table><thead><tr><th>Equipamento</th><th>Tipo</th><th>Prioridade</th><th>Abertura</th><th>Descrição</th><th>Status</th></tr></thead><tbody>${state.maintenances.map(x=>`<tr><td><strong>${escapeHtml(x.forklift)}</strong></td><td>${escapeHtml(x.type)}</td><td>${badge(x.priority)}</td><td>${dateBR(x.openedAt)}</td><td>${escapeHtml(x.description)}</td><td>${badge(x.status)}</td></tr>`).join('') || `<tr><td colspan="6"><div class="empty">Nenhuma ordem aberta.</div></td></tr>`}</tbody></table></div></section>`;
 }
 
 function renderDDS() {
@@ -323,10 +307,8 @@ function renderNotifications() {
 }
 
 function renderReports() {
-  const epiValue = state.epis.reduce((s,x)=>s+Number(x.stock)*Number(x.unitCost),0);
-  const maintenanceCost = state.maintenances.reduce((s,x)=>s+Number(x.cost),0);
   $('#page-content').innerHTML = `<div class="toolbar"><div><h3 style="margin:0">Relatórios gerenciais</h3><p class="muted" style="margin:5px 0 0">Indicadores consolidados e exportação dos dados.</p></div><div class="toolbar-right"><button class="btn primary" data-action="export" data-export="all">Exportar base completa</button></div></div>
-  <div class="metrics">${metric('Patrimônio em EPI', currency(epiValue), '⬡', `${state.epis.reduce((s,x)=>s+Number(x.stock),0)} unidades`)}${metric('Custo de manutenção', currency(maintenanceCost), '⚒', `${state.maintenances.length} ordens`)}${metric('Conformidade de cursos', `${Math.round(state.courses.filter(x=>daysUntil(x.expiresAt)>=0).length/Math.max(1,state.courses.length)*100)}%`, '▤', 'Base cadastrada')}${metric('Disponibilidade de frota', `${Math.round(state.forklifts.filter(x=>['Operando','Disponível'].includes(x.status)).length/Math.max(1,state.forklifts.length)*100)}%`, '▰', 'Situação atual')}</div>
+  <div class="metrics">${metric('Unidades de EPI', state.epis.reduce((s,x)=>s+Number(x.stock),0), '⬡', `${state.epis.length} itens`)}${metric('Ordens de manutenção', state.maintenances.length, '⚒', `${state.maintenances.filter(x=>x.status!=='Concluída').length} abertas`)}${metric('Cursos registrados', state.courses.length, '▤', 'Base cadastrada')}${metric('Disponibilidade de frota', `${Math.round(state.forklifts.filter(x=>['Operando','Disponível'].includes(x.status)).length/Math.max(1,state.forklifts.length)*100)}%`, '▰', 'Situação atual')}</div>
   <section class="panel"><div class="panel-header"><h3>Últimas alterações</h3></div><div class="alert-list">${state.audit.slice(0,8).map(x=>`<div class="alert-item"><span class="alert-dot">↺</span><span><strong>${escapeHtml(x.action)}</strong><small>${new Date(x.date).toLocaleString('pt-BR')} • ${escapeHtml(x.user)}</small></span></div>`).join('') || '<div class="empty">Nenhuma alteração registrada.</div>'}</div></section>`;
 }
 
@@ -342,12 +324,12 @@ const formSchemas = {
   },
   epi: {
     title: 'EPI', collection: 'epis', fields: [
-      ['code','Código interno','text',true], ['name','Descrição do EPI','text',true], ['category','Categoria','text',true], ['ca','Certificado de Aprovação (CA)','text',true], ['caExpiry','Validade do CA','date',true], ['size','Tamanho','text',true], ['stock','Estoque atual','number',true], ['minimum','Estoque mínimo','number',true], ['unitCost','Custo unitário','number',true], ['location','Localização','text',true], ['status','Status','select',true,['Ativo','Inativo','Estoque baixo']]
+      ['code','Código interno','text',true], ['name','Descrição do EPI','text',true], ['category','Categoria','text',true], ['ca','Certificado de Aprovação (CA)','text',true], ['size','Tamanho','text',true], ['stock','Estoque atual','number',true], ['minimum','Estoque mínimo','number',true], ['location','Localização','text',true], ['status','Status','select',true,['Ativo','Inativo','Estoque baixo']]
     ]
   },
   course: {
     title: 'Curso / certificado', collection: 'courses', fields: [
-      ['employee','Funcionário','select',true,()=>state.employees.map(x=>x.name)], ['employeeRegistration','Matrícula','text',true], ['course','Curso / treinamento','text',true], ['institution','Instituição','text',true], ['completedAt','Data de realização','date',true], ['expiresAt','Validade','date',true], ['hours','Carga horária','number',true], ['certificate','Arquivo atual','text',false], ['certificateFile','Enviar certificado','file',false]
+      ['employee','Funcionário','select',true,()=>state.employees.map(x=>x.name)], ['employeeRegistration','Matrícula','text',true], ['course','Curso / treinamento','text',true], ['institution','Instituição','text',true], ['completedAt','Data de realização','date',true], ['hours','Carga horária','number',true], ['certificate','Arquivo atual','text',false], ['certificateFile','Enviar certificado','file',false]
     ]
   },
   forklift: {
@@ -391,7 +373,7 @@ function openForm(type, id = '') {
     const forklift = state.forklifts.find(x=>x.id===id);
     $('#modal-kicker').textContent = 'ORDEM DE SERVIÇO'; $('#modal-title').textContent = `Manutenção — ${forklift.code}`;
     form.dataset.type = type; form.dataset.id = id;
-    form.innerHTML = `${formField(['type','Tipo','select',true,['Preventiva','Corretiva','Inspeção']])}${formField(['priority','Prioridade','select',true,['Baixa','Média','Alta','Crítica']])}${formField(['openedAt','Data de abertura','date',true],todayISO())}<label>Status<select name="status" required><option>Aberta</option><option>Em andamento</option><option>Aguardando peça</option><option>Concluída</option></select></label><label class="span-2">Descrição<textarea name="description" required></textarea></label>${formField(['cost','Custo previsto','number',true],0)}${formField(['attachmentFile','Anexar documento','file',false])}<div class="form-actions"><button type="button" class="btn" data-action="close-modal">Cancelar</button><button type="submit" class="btn primary">Abrir ordem</button></div>`;
+    form.innerHTML = `${formField(['type','Tipo','select',true,['Preventiva','Corretiva','Inspeção']])}${formField(['priority','Prioridade','select',true,['Baixa','Média','Alta','Crítica']])}${formField(['openedAt','Data de abertura','date',true],todayISO())}<label>Status<select name="status" required><option>Aberta</option><option>Em andamento</option><option>Aguardando peça</option><option>Concluída</option></select></label><label class="span-2">Descrição<textarea name="description" required></textarea></label>${formField(['attachmentFile','Anexar documento','file',false])}<div class="form-actions"><button type="button" class="btn" data-action="close-modal">Cancelar</button><button type="submit" class="btn primary">Abrir ordem</button></div>`;
   } else if (type === 'checklist') {
     const forklift = state.forklifts.find(x=>x.id===id);
     const items = ['Pneus e rodas','Garfos e trava','Correntes e mastro','Freios','Buzina','Luzes e sinalização','Vazamentos','Cinto de segurança','Extintor','Bateria / combustível'];
@@ -415,7 +397,7 @@ async function handleFormSubmit(event) {
       const epi=state.epis.find(x=>x.id===id); const employee=state.employees.find(x=>x.name===data.employee); const qty=Number(data.quantity); if(!employee) throw new Error('Funcionário não encontrado');
       const q=await db.rpc('register_epi_delivery',{p_epi_id:epi.id,p_employee_id:employee.id,p_quantity:qty,p_reason:data.reason,p_movement_date:data.date,p_signed:data.signed==='Sim'}); if(q.error) throw q.error; await loadData(); toast('Entrega registrada e estoque atualizado.');
     } else if(type==='maintenance'){
-      const forklift=state.forklifts.find(x=>x.id===id); const path=await uploadFromForm(form,'attachmentFile','maintenance'); state.maintenances.unshift({id:crypto.randomUUID(),forkliftId:forklift.id,forklift:forklift.code,type:data.type,priority:data.priority,openedAt:data.openedAt,description:data.description,status:data.status,cost:Number(data.cost),attachment:path}); forklift.status=data.type==='Corretiva'?'Manutenção corretiva':'Manutenção programada'; await syncState(`Ordem de serviço aberta para ${forklift.code}`); toast('Ordem de serviço aberta.');
+      const forklift=state.forklifts.find(x=>x.id===id); const path=await uploadFromForm(form,'attachmentFile','maintenance'); state.maintenances.unshift({id:crypto.randomUUID(),forkliftId:forklift.id,forklift:forklift.code,type:data.type,priority:data.priority,openedAt:data.openedAt,description:data.description,status:data.status,attachment:path}); forklift.status=data.type==='Corretiva'?'Manutenção corretiva':'Manutenção programada'; await syncState(`Ordem de serviço aberta para ${forklift.code}`); toast('Ordem de serviço aberta.');
     } else if(type==='checklist'){
       const forklift=state.forklifts.find(x=>x.id===id); const items=Object.entries(data).filter(([k])=>k.startsWith('item_')).map(([k,v],i)=>({item:i+1,status:v})); const failed=items.filter(i=>i.status==='Não conforme').length;
       const q=await db.from('forklift_checklists').insert({forklift_id:forklift.id,inspection_date:data.date,shift:data.shift,hour_meter:Number(forklift.hourMeter),items,has_critical_failure:failed>0,notes:data.notes||null,inspected_by:currentUser.id}); if(q.error) throw q.error;
@@ -450,8 +432,15 @@ function downloadCSV(filename, rows) {
 }
 
 function exportData(type) {
-  const map = { employees: state.employees, epis: state.epis, courses: state.courses, forklifts: state.forklifts, dds: state.dds, notifications: getNotifications() };
-  if (type === 'dashboard') return downloadCSV('resumo-dashboard.csv', [{ indicador: 'Funcionários ativos', valor: state.employees.filter(x=>x.status==='Ativo').length }, { indicador: 'Alertas ativos', valor: getNotifications().length }]);
+  const map = {
+    employees: state.employees,
+    epis: state.epis.map(({caExpiry,unitCost,...item})=>item),
+    courses: state.courses.map(({expiresAt,...item})=>item),
+    forklifts: state.forklifts,
+    dds: state.dds,
+    notifications: getNotifications()
+  };
+  if (type === 'dashboard') return downloadCSV('resumo-dashboard.csv', [{ indicador: 'Funcionários ativos', quantidade: state.employees.filter(x=>x.status==='Ativo').length }, { indicador: 'Alertas ativos', quantidade: getNotifications().length }]);
   if (type === 'all') return downloadCSV('gestao-segura-base-completa.csv', Object.entries(map).flatMap(([module,rows])=>rows.map(row=>({ modulo: module, ...row }))));
   downloadCSV(`${type}.csv`, map[type] || []);
 }

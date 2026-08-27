@@ -5,8 +5,8 @@ Site app independente para controle de saúde, segurança e apoio operacional.
 ## Módulos da primeira versão
 
 - Funcionários e situação funcional
-- Estoque, validade de CA e entrega de EPI
-- Cursos, certificados e vencimentos
+- Estoque, CA e entrega de EPI
+- Cursos e certificados
 - Empilhadeiras, checklist e ordens de manutenção
 - DDS, programação e participação
 - Dashboard, alertas automáticos, auditoria e exportação CSV
