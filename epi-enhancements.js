@@ -50,11 +50,10 @@
     });
     const categories = [...new Set(state.epis.map(item => item.category).filter(Boolean))];
     const active = state.epis.filter(item => item.status === 'Ativo').length;
-    const expiring = state.epis.filter(item => daysUntil(item.caExpiry) <= 90).length;
 
     $('#page-content').innerHTML = `${toolbar(
       'Cadastro de EPI',
-      'Catálogo mestre com CA, categoria, tamanho, custo e localização.',
+      'Catálogo mestre com CA, categoria, tamanho e localização.',
       'Cadastrar EPI',
       'epi',
       `<select id="table-filter" class="select"><option>Todos</option>${categories.map(item => `<option ${tableFilter === item ? 'selected' : ''}>${escapeHtml(item)}</option>`).join('')}</select>`
@@ -62,17 +61,15 @@
       <div class="metrics" style="margin-bottom:16px">
         ${metric('EPIs cadastrados', state.epis.length, '⬡', `${active} ativos`)}
         ${metric('Categorias', categories.length, '▦', 'Catálogo organizado')}
-        ${metric('CAs em até 90 dias', expiring, '⌛', expiring ? 'Revisar validade' : 'Tudo regular', !expiring)}
-        ${metric('Valor unitário médio', currency(state.epis.reduce((sum, item) => sum + Number(item.unitCost), 0) / Math.max(1, state.epis.length)), 'R$', 'Média do catálogo')}
+        ${metric('Locais de armazenamento', new Set(state.epis.map(item => item.location).filter(Boolean)).size, '▥', 'Estoque organizado')}
       </div>
       <div class="table-card"><div class="table-wrap"><table>
-        <thead><tr><th>EPI</th><th>Categoria</th><th>CA / validade</th><th>Tamanho</th><th>Custo</th><th>Localização</th><th>Status</th><th>Ações</th></tr></thead>
+        <thead><tr><th>EPI</th><th>Categoria</th><th>CA</th><th>Tamanho</th><th>Localização</th><th>Status</th><th>Ações</th></tr></thead>
         <tbody>${rows.map(item => `<tr>
           <td><div class="entity"><span class="entity-avatar">⬡</span><span><strong>${escapeHtml(item.name)}</strong><small>${escapeHtml(item.code)}</small></span></div></td>
           <td>${escapeHtml(item.category)}</td>
-          <td><strong>CA ${escapeHtml(item.ca)}</strong><br><span class="muted">${dateBR(item.caExpiry)}</span></td>
+          <td><strong>CA ${escapeHtml(item.ca)}</strong></td>
           <td>${escapeHtml(item.size)}</td>
-          <td>${currency(item.unitCost)}</td>
           <td>${escapeHtml(item.location)}</td>
           <td>${badge(item.status)}</td>
           <td><div class="actions">
@@ -80,7 +77,7 @@
             <button class="btn small primary" data-page="epi-inventory">Estoque</button>
             ${canArchiveEpi() ? `<button class="btn small danger" data-action="delete" data-collection="epis" data-id="${item.id}">Arquivar</button>` : ''}
           </div></td>
-        </tr>`).join('') || '<tr><td colspan="8"><div class="empty">Nenhum EPI cadastrado.</div></td></tr>'}</tbody>
+        </tr>`).join('') || '<tr><td colspan="7"><div class="empty">Nenhum EPI cadastrado.</div></td></tr>'}</tbody>
       </table></div></div>`;
   };
 
@@ -124,13 +121,11 @@
     });
     const totalUnits = state.epis.reduce((sum, item) => sum + Number(item.stock), 0);
     const lowStock = state.epis.filter(item => Number(item.stock) <= Number(item.minimum)).length;
-    const stockValue = state.epis.reduce((sum, item) => sum + Number(item.stock) * Number(item.unitCost), 0);
 
     $('#page-content').innerHTML = `${inventoryToolbar()}
       <div class="metrics" style="margin-bottom:16px">
         ${metric('Itens no inventário', state.epis.length, '▥', `${totalUnits} unidades`)}
         ${metric('Estoque baixo', lowStock, '!', lowStock ? 'Reposição necessária' : 'Estoque regular', !lowStock)}
-        ${metric('Valor em estoque', currency(stockValue), 'R$', 'Patrimônio atual')}
         ${metric('Entregas registradas', state.epiDeliveries.length, '↗', 'Histórico rastreável')}
       </div>
       <div class="inventory-grid">
@@ -142,7 +137,7 @@
               <div><p class="eyebrow">${escapeHtml(item.code)} • ${escapeHtml(item.category)}</p><h3>${escapeHtml(item.name)}</h3><span class="muted">${escapeHtml(item.size)} • ${escapeHtml(item.location)}</span></div>
               ${badge(status[0], status[1])}
             </div>
-            <div class="inventory-numbers"><div><small>Saldo atual</small><strong>${number(item.stock)}</strong></div><div><small>Estoque mínimo</small><strong>${number(item.minimum)}</strong></div><div><small>Valor em estoque</small><strong>${currency(Number(item.stock) * Number(item.unitCost))}</strong></div></div>
+            <div class="inventory-numbers"><div><small>Saldo atual</small><strong>${number(item.stock)}</strong></div><div><small>Estoque mínimo</small><strong>${number(item.minimum)}</strong></div></div>
             <div class="progress inventory-progress"><span style="width:${percentage}%"></span></div>
             <div class="actions inventory-actions">
               <button class="btn small primary" data-action="open-form" data-form="inventory-entry" data-id="${item.id}">Entrada</button>
@@ -185,7 +180,6 @@
       <label>Lote / referência<input name="batchReference" type="text" placeholder="Ex.: LOTE-2026-015" /></label>
       <label>Fornecedor<input name="supplier" type="text" /></label>
       <label>Nota fiscal / documento<input name="invoiceNumber" type="text" /></label>
-      <label>Custo unitário (R$)<input name="unitCost" type="number" min="0" step="0.01" value="${selected?.unitCost ?? 0}" /></label>
       <label class="span-2">Observação<textarea name="notes" placeholder="Informações adicionais da entrada"></textarea></label>
       <div class="form-actions"><button type="button" class="btn" data-action="close-modal">Cancelar</button><button type="submit" class="btn primary">Registrar entrada</button></div>`;
     modal.classList.remove('hidden');
@@ -210,9 +204,6 @@
       const quantity = Number(data.quantity);
       if (!epi || !Number.isFinite(quantity) || quantity <= 0) throw new Error('Informe um EPI e uma quantidade válida.');
 
-      const unitCost = Number(data.unitCost || 0);
-      if (!Number.isFinite(unitCost) || unitCost < 0) throw new Error('Informe um custo unitário válido.');
-
       const entry = await db.rpc('register_epi_inventory_entry', {
         p_epi_id: epi.id,
         p_quantity: quantity,
@@ -220,7 +211,7 @@
         p_batch_number: data.batchReference || null,
         p_supplier: data.supplier || null,
         p_invoice_number: data.invoiceNumber || null,
-        p_unit_cost: unitCost,
+        p_unit_cost: Number(epi.unitCost || 0),
         p_notes: data.notes || null
       });
       if (entry.error) throw entry.error;
